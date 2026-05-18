@@ -1,0 +1,73 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.chip {
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(0, 240, 208, 0.2);
+  background: rgba(0, 240, 208, 0.04);
+  color: #8a9a9a;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
+}
+
+.chip:hover {
+  border-color: rgba(0, 240, 208, 0.45);
+  color: #fff;
+}
+
+.chip.active {
+  border-color: rgba(0, 240, 208, 0.55);
+  background: rgba(0, 240, 208, 0.12);
+  color: #00f0d0;
+}
+
+.chip.custom {
+  border-color: rgba(255, 216, 77, 0.4);
+  color: #ffd84d;
+}
+
+.customRow {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.input {
+  flex: 1;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 240, 208, 0.15);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+}
+
+.input:focus {
+  outline: none;
+  border-color: rgba(0, 240, 208, 0.45);
+}
+
+.addBtn {
+  padding: 0.45rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 240, 208, 0.35);
+  background: rgba(0, 240, 208, 0.08);
+  color: #00f0d0;
+  cursor: pointer;
+}
+
+.addBtn:hover {
+  background: rgba(0, 240, 208, 0.16);
+}

@@ -1,0 +1,158 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  height: 100%;
+  min-height: 280px;
+  padding: 0.9rem;
+  border-radius: 14px;
+  background: rgba(3, 10, 10, 0.94);
+  border: 1px solid rgba(0, 240, 208, 0.1);
+  transition: border-color 0.15s;
+}
+
+.card:hover {
+  border-color: rgba(0, 240, 208, 0.22);
+}
+
+.card.selected {
+  border-color: rgba(0, 240, 208, 0.45);
+}
+
+.selectRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.checkbox {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #00f0d0;
+}
+
+.body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 0.85rem;
+  align-content: start;
+}
+
+.imageWrap {
+  width: 100px;
+  height: 100px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(0, 240, 208, 0.08);
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.imagePlaceholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  color: #8a9a9a;
+  text-align: center;
+  padding: 0.25rem;
+}
+
+.content {
+  min-width: 0;
+}
+
+.title {
+  margin: 0 0 0.2rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #fff;
+}
+
+.venue {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  color: #00f0d0;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  color: #8a9a9a;
+  margin-bottom: 0.4rem;
+}
+
+.dot {
+  opacity: 0.5;
+}
+
+.genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.4rem;
+}
+
+.genreChip {
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  background: rgba(0, 240, 208, 0.08);
+  border: 1px solid rgba(0, 240, 208, 0.2);
+  color: #8a9a9a;
+}
+
+.source {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  color: #6a7a7a;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.linkBtn {
+  display: inline-flex;
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  text-decoration: none;
+  border: 1px solid rgba(0, 240, 208, 0.3);
+  color: #00f0d0;
+}
+
+.linkBtn:hover {
+  background: rgba(0, 240, 208, 0.08);
+}
+
+.editBtn {
+  width: 100%;
+  margin-top: auto;
+  flex-shrink: 0;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 240, 208, 0.25);
+  background: rgba(0, 240, 208, 0.06);
+  color: #00f0d0;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.editBtn:hover {
+  background: rgba(0, 240, 208, 0.14);
+}

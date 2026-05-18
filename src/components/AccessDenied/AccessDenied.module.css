@@ -1,0 +1,70 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: #020707;
+}
+
+.card {
+  width: min(440px, 100%);
+  padding: 2rem;
+  border-radius: 16px;
+  background: rgba(3, 10, 10, 0.94);
+  border: 1px solid rgba(255, 107, 107, 0.25);
+  text-align: center;
+}
+
+.title {
+  margin: 0 0 0.75rem;
+  color: #ff8a8a;
+}
+
+.message {
+  margin: 0 0 1rem;
+  color: #8a9a9a;
+  line-height: 1.5;
+}
+
+.detail {
+  margin: 0 0 0.75rem;
+  font-size: 0.82rem;
+  color: #ffd84d;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.detail code {
+  font-size: 0.78rem;
+  word-break: break-all;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-top: 1rem;
+}
+
+.retryBtn {
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 240, 208, 0.35);
+  background: rgba(0, 240, 208, 0.08);
+  color: #00f0d0;
+  cursor: pointer;
+}
+
+.btn {
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(138, 154, 154, 0.35);
+  background: transparent;
+  color: #8a9a9a;
+  cursor: pointer;
+}
+
+.btn:hover {
+  color: #fff;
+}

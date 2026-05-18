@@ -1,0 +1,93 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: #020707;
+}
+
+.card {
+  width: min(400px, 100%);
+  padding: 2rem 1.75rem;
+  border-radius: 16px;
+  background: rgba(3, 10, 10, 0.94);
+  border: 1px solid rgba(0, 240, 208, 0.15);
+}
+
+.kicker {
+  margin: 0 0 0.25rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #00f0d0;
+}
+
+.title {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+}
+
+.subtitle {
+  margin: 0 0 1.25rem;
+  color: #8a9a9a;
+  font-size: 0.9rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a9a9a;
+}
+
+.input {
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 240, 208, 0.15);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+}
+
+.input:focus {
+  outline: none;
+  border-color: rgba(0, 240, 208, 0.45);
+}
+
+.error {
+  margin: 0;
+  color: #ff8a8a;
+  font-size: 0.85rem;
+}
+
+.submitBtn {
+  margin-top: 0.25rem;
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 240, 208, 0.45);
+  background: rgba(0, 240, 208, 0.12);
+  color: #00f0d0;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: rgba(0, 240, 208, 0.2);
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

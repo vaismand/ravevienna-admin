@@ -1,0 +1,56 @@
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: flex-end;
+  padding: 1rem 1.1rem;
+  background: rgba(3, 10, 10, 0.94);
+  border: 1px solid rgba(0, 240, 208, 0.12);
+  border-radius: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 140px;
+  flex: 1;
+  max-width: 220px;
+}
+
+.label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8a9a9a;
+}
+
+.input,
+.select {
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 240, 208, 0.15);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+}
+
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: rgba(0, 240, 208, 0.45);
+}
+
+.clearBtn {
+  padding: 0.5rem 0.85rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 216, 77, 0.35);
+  background: transparent;
+  color: #ffd84d;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: flex-end;
+}
+
+.clearBtn:hover {
+  background: rgba(255, 216, 77, 0.08);
+}

@@ -1,0 +1,165 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.75);
+  padding: 1rem;
+}
+
+.panel {
+  width: min(640px, 100%);
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  background: rgba(3, 10, 10, 0.98);
+  border: 1px solid rgba(0, 240, 208, 0.18);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 1rem 1.15rem 0.75rem;
+  border-bottom: 1px solid rgba(0, 240, 208, 0.1);
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.heading {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.closeBtn {
+  border: none;
+  background: transparent;
+  color: #8a9a9a;
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+.closeBtn:hover {
+  color: #fff;
+}
+
+.form {
+  padding: 1rem 1.15rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a9a9a;
+}
+
+.input {
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 240, 208, 0.15);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+}
+
+.input:focus {
+  outline: none;
+  border-color: rgba(0, 240, 208, 0.45);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.footer {
+  padding: 0.85rem 1.15rem 1rem;
+  border-top: 1px solid rgba(0, 240, 208, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.primaryActions,
+.statusActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.saveBtn,
+.approveBtn,
+.rejectBtn,
+.pendingBtn,
+.publishBtn {
+  padding: 0.45rem 0.8rem;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.saveBtn:disabled,
+.approveBtn:disabled,
+.rejectBtn:disabled,
+.pendingBtn:disabled,
+.publishBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.saveBtn {
+  border-color: rgba(0, 240, 208, 0.45);
+  background: rgba(0, 240, 208, 0.12);
+  color: #00f0d0;
+}
+
+.approveBtn {
+  border-color: rgba(0, 240, 208, 0.35);
+  background: transparent;
+  color: #00f0d0;
+}
+
+.rejectBtn {
+  border-color: rgba(255, 107, 107, 0.4);
+  background: transparent;
+  color: #ff8a8a;
+}
+
+.pendingBtn {
+  border-color: rgba(255, 216, 77, 0.4);
+  background: transparent;
+  color: #ffd84d;
+}
+
+.publishBtn {
+  border-color: rgba(168, 196, 255, 0.4);
+  background: rgba(168, 196, 255, 0.08);
+  color: #a8c4ff;
+}

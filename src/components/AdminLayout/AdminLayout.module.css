@@ -1,0 +1,68 @@
+.layout {
+  min-height: 100vh;
+  background: #020707;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgba(0, 240, 208, 0.1);
+  background: rgba(3, 10, 10, 0.6);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.kicker {
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #00f0d0;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.userArea {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.email {
+  font-size: 0.82rem;
+  color: #8a9a9a;
+}
+
+.signOutBtn {
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(138, 154, 154, 0.3);
+  background: transparent;
+  color: #8a9a9a;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.signOutBtn:hover {
+  color: #fff;
+  border-color: rgba(138, 154, 154, 0.5);
+}
+
+.main {
+  padding: 1.25rem 1.5rem 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
