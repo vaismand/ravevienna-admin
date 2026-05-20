@@ -10,7 +10,7 @@ Web admin panel for reviewing scraped event data before it goes live in the Rave
 - Edit draft fields (title, venue, date, genres, URLs, etc.)
 - **Add events manually** (not only from the scraper)
 - Approve, reject, or publish to the public `events` table
-- Bulk approve / reject / publish
+- Bulk approve / reject / delete / publish
 
 Publishing copies approved drafts into `events` (matched on `source_id` + `external_id`) and marks the draft as published.
 

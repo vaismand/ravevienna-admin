@@ -41,6 +41,11 @@ CREATE POLICY "Admins update draft_events"
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
 
+DROP POLICY IF EXISTS "Admins delete draft_events" ON public.draft_events;
+CREATE POLICY "Admins delete draft_events"
+  ON public.draft_events FOR DELETE
+  USING (public.is_admin());
+
 -- events (publish target)
 ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
 

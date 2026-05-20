@@ -181,6 +181,15 @@ export async function bulkUpdateStatus(
   if (error) throw new Error(formatPostgrestError(error));
 }
 
+/** Permanently remove drafts from draft_events (scraper can re-insert them later). */
+export async function bulkDeleteDraftEvents(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+
+  const { error } = await supabase.from('draft_events').delete().in('id', ids);
+
+  if (error) throw new Error(formatPostgrestError(error));
+}
+
 export async function bulkPublish(
   drafts: DraftEvent[],
 ): Promise<{ succeeded: number; failed: string[] }> {

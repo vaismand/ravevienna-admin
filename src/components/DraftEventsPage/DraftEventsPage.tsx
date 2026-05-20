@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { STATUS_TABS } from '../../lib/constants';
 import {
+  bulkDeleteDraftEvents,
   bulkPublish,
   bulkUpdateStatus,
   createDraftEvent,
@@ -27,7 +28,12 @@ import { DraftEventEditor } from '../DraftEventEditor/DraftEventEditor';
 import { FiltersBar } from '../FiltersBar/FiltersBar';
 import styles from './DraftEventsPage.module.css';
 
-type ConfirmAction = 'bulkApprove' | 'bulkReject' | 'bulkPublish' | null;
+type ConfirmAction =
+  | 'bulkApprove'
+  | 'bulkReject'
+  | 'bulkDelete'
+  | 'bulkPublish'
+  | null;
 
 const defaultFilters = (status: DraftEventStatus): DraftEventFilters => ({
   status,
@@ -189,6 +195,19 @@ export function DraftEventsPage() {
     setConfirmAction(null);
   };
 
+  const executeBulkDelete = async () => {
+    const ids = [...selectedIds];
+    await runWithBusy(async () => {
+      await bulkDeleteDraftEvents(ids);
+      notify(
+        `Deleted ${ids.length} draft event(s) from the database. The scraper can add them again on the next run.`,
+        'success',
+      );
+      await refreshAfterAction();
+    });
+    setConfirmAction(null);
+  };
+
   const executeBulkPublish = async () => {
     const toPublish = selectedEvents.filter((e) => e.status === 'approved');
     if (toPublish.length === 0) {
@@ -224,6 +243,13 @@ export function DraftEventsPage() {
       confirmLabel: 'Reject all',
       variant: 'danger' as const,
       onConfirm: () => void executeBulkReject(),
+    },
+    bulkDelete: {
+      title: 'Delete selected events?',
+      message: `Permanently delete ${selectedIds.size} draft event(s) from draft_events? This cannot be undone. The scraper can insert them again on the next run.`,
+      confirmLabel: 'Delete permanently',
+      variant: 'danger' as const,
+      onConfirm: () => void executeBulkDelete(),
     },
     bulkPublish: {
       title: 'Publish selected events?',
@@ -315,6 +341,14 @@ export function DraftEventsPage() {
             onClick={() => setConfirmAction('bulkReject')}
           >
             Reject selected
+          </button>
+          <button
+            type="button"
+            className={`${styles.bulkBtn} ${styles.danger}`}
+            disabled={selectedIds.size === 0 || busy}
+            onClick={() => setConfirmAction('bulkDelete')}
+          >
+            Delete selected
           </button>
           <button
             type="button"
