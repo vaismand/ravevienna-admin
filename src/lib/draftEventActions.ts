@@ -54,6 +54,44 @@ export function formDataToUpdatePayload(data: DraftEventFormData) {
   };
 }
 
+export function resolveManualSourceId(
+  sources: { id: string; name: string; slug?: string | null }[],
+  preferredId?: string,
+): string | null {
+  if (preferredId) return preferredId;
+  const manual = sources.find(
+    (s) =>
+      s.slug?.toLowerCase() === 'manual' ||
+      s.name.toLowerCase() === 'manual' ||
+      s.name.toLowerCase().includes('manual'),
+  );
+  return manual?.id ?? sources[0]?.id ?? null;
+}
+
+export async function createDraftEvent(
+  data: DraftEventFormData,
+  sourceId: string,
+  initialStatus: DraftEventStatus = 'pending',
+): Promise<DraftEvent> {
+  const externalId = `manual-${crypto.randomUUID()}`;
+
+  const { data: row, error } = await supabase
+    .from('draft_events')
+    .insert({
+      ...formDataToUpdatePayload(data),
+      source_id: sourceId,
+      external_id: externalId,
+      status: initialStatus,
+      confidence: 1,
+      raw_data: { manual: true, created_at: new Date().toISOString() },
+    })
+    .select('*')
+    .single();
+
+  if (error) throw new Error(formatPostgrestError(error));
+  return row as DraftEvent;
+}
+
 export async function saveDraftEvent(
   id: string,
   data: DraftEventFormData,

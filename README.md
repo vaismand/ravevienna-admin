@@ -1,73 +1,55 @@
-# React + TypeScript + Vite
+# RaveVienna Admin
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Web admin panel for reviewing scraped event data before it goes live in the RaveVienna mobile app.
 
-Currently, two official plugins are available:
+## What it does
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Sign in with Supabase Auth (admin role only via `profiles.role`)
+- Browse draft events by status: **Pending**, **Approved**, **Rejected**, **Published**
+- Filter by venue, genre, source, and search
+- Edit draft fields (title, venue, date, genres, URLs, etc.)
+- **Add events manually** (not only from the scraper)
+- Approve, reject, or publish to the public `events` table
+- Bulk approve / reject / publish
 
-## React Compiler
+Publishing copies approved drafts into `events` (matched on `source_id` + `external_id`) and marks the draft as published.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech stack
 
-## Expanding the ESLint configuration
+- [Vite](https://vitejs.dev/)
+- [React](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/)
+- [Supabase](https://supabase.com/) client (anon key only — no service role in the frontend)
+- Plain CSS modules (no UI framework)
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Setup
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+cp .env.example .env.local
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Set in `.env.local`:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```env
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
+
+Create an admin user in Supabase Auth and set `profiles.role = 'admin'` for that user.
+
+Row Level Security policies for admin access are in `supabase/admin-rls.sql` — run that in the Supabase SQL Editor if reads or writes fail.
+
+## Scripts
+
+```bash
+npm install
+npm run dev      # local dev server
+npm run build    # production build
+npm run preview  # preview production build
+```
+
+## Database tables used
+
+- `draft_events` — scraped and manual drafts for review
+- `events` — published events for the app
+- `venues`, `event_sources` — reference data
+- `profiles` — admin role check

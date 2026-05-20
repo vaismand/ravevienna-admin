@@ -3,6 +3,7 @@ import { STATUS_TABS } from '../../lib/constants';
 import {
   bulkPublish,
   bulkUpdateStatus,
+  createDraftEvent,
   formDataToUpdatePayload,
   publishDraftEvent,
   saveDraftEvent,
@@ -19,6 +20,7 @@ import type {
   DraftEventFormData,
   DraftEventStatus,
 } from '../../types/database';
+import { CreateDraftEventModal } from '../CreateDraftEventModal/CreateDraftEventModal';
 import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog';
 import { DraftEventCard } from '../DraftEventCard/DraftEventCard';
 import { DraftEventEditor } from '../DraftEventEditor/DraftEventEditor';
@@ -42,6 +44,7 @@ export function DraftEventsPage() {
   );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editingEvent, setEditingEvent] = useState<DraftEvent | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
 
@@ -107,6 +110,28 @@ export function DraftEventsPage() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const handleCreate = async (
+    data: DraftEventFormData,
+    sourceId: string,
+    status: DraftEventStatus,
+  ) => {
+    await runWithBusy(async () => {
+      await createDraftEvent(data, sourceId, status);
+      notify(
+        status === 'approved'
+          ? 'Event created and approved.'
+          : 'Event created as pending.',
+        'success',
+      );
+      setCreateOpen(false);
+      if (activeTab !== status) {
+        switchTab(status);
+      } else {
+        await reload();
+      }
+    });
   };
 
   const handleSave = async (data: DraftEventFormData) => {
@@ -215,7 +240,8 @@ export function DraftEventsPage() {
 
   return (
     <div className={styles.page}>
-      <div className={styles.tabs}>
+      <div className={styles.tabsRow}>
+        <div className={styles.tabs}>
         {STATUS_TABS.map((tab) => (
           <button
             key={tab.key}
@@ -229,6 +255,14 @@ export function DraftEventsPage() {
             )}
           </button>
         ))}
+        </div>
+        <button
+          type="button"
+          className={styles.addEventBtn}
+          onClick={() => setCreateOpen(true)}
+        >
+          + Add event
+        </button>
       </div>
 
       <FiltersBar
@@ -342,6 +376,15 @@ export function DraftEventsPage() {
           ))}
         </div>
       )}
+
+      <CreateDraftEventModal
+        open={createOpen}
+        busy={busy}
+        venues={venues}
+        sources={sources}
+        onClose={() => setCreateOpen(false)}
+        onCreate={handleCreate}
+      />
 
       {editingEvent && (
         <DraftEventEditor

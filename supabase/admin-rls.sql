@@ -82,3 +82,8 @@ DROP POLICY IF EXISTS "Admins read event_sources" ON public.event_sources;
 CREATE POLICY "Admins read event_sources"
   ON public.event_sources FOR SELECT
   USING (public.is_admin());
+
+-- Optional: source for hand-entered events (pick in "Add event" form)
+-- INSERT INTO public.event_sources (name, slug)
+-- VALUES ('Manual', 'manual')
+-- ON CONFLICT DO NOTHING;
