@@ -3,7 +3,7 @@ import { formatPostgrestError } from './supabaseErrors';
 import type {
   DraftEvent,
   DraftEventFormData,
-  DraftEventStatus,
+  ReviewStatus,
 } from '../types/database';
 
 function parsePrice(value: string): number | null {
@@ -71,7 +71,7 @@ export function resolveManualSourceId(
 export async function createDraftEvent(
   data: DraftEventFormData,
   sourceId: string,
-  initialStatus: DraftEventStatus = 'pending',
+  initialStatus: ReviewStatus = 'pending',
 ): Promise<DraftEvent> {
   const externalId = `manual-${crypto.randomUUID()}`;
 
@@ -106,7 +106,7 @@ export async function saveDraftEvent(
 
 export async function updateDraftStatus(
   id: string,
-  status: DraftEventStatus,
+  status: ReviewStatus,
 ): Promise<void> {
   const { error } = await supabase
     .from('draft_events')
@@ -171,7 +171,7 @@ export async function publishDraftEvent(draft: DraftEvent): Promise<void> {
 
 export async function bulkUpdateStatus(
   ids: string[],
-  status: DraftEventStatus,
+  status: ReviewStatus,
 ): Promise<void> {
   const { error } = await supabase
     .from('draft_events')

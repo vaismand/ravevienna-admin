@@ -5,7 +5,8 @@ Web admin panel for reviewing scraped event data before it goes live in the Rave
 ## What it does
 
 - Sign in with Supabase Auth (admin role only via `profiles.role`)
-- Browse draft events by status: **Pending**, **Approved**, **Rejected**, **Published**
+- Two review queues: **Scraped drafts** (`draft_events`) and **User submissions** (`event_submissions`)
+- Browse each by status: **Pending**, **Approved**, **Rejected**, **Published**
 - Filter by venue, genre, source, and search
 - Edit draft fields (title, venue, date, genres, URLs, etc.)
 - **Add events manually** (not only from the scraper)
@@ -50,6 +51,7 @@ npm run preview  # preview production build
 ## Database tables used
 
 - `draft_events` — scraped and manual drafts for review
+- `event_submissions` — events submitted by app users
 - `events` — published events for the app
 - `venues`, `event_sources` — reference data
 - `profiles` — admin role check

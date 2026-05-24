@@ -4,6 +4,13 @@
   gap: 1rem;
 }
 
+.sectionHint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #8a9a9a;
+  line-height: 1.45;
+}
+
 .tabsRow {
   display: flex;
   flex-wrap: wrap;

@@ -19,7 +19,7 @@ import type {
   DraftEvent,
   DraftEventFilters,
   DraftEventFormData,
-  DraftEventStatus,
+  ReviewStatus,
 } from '../../types/database';
 import { CreateDraftEventModal } from '../CreateDraftEventModal/CreateDraftEventModal';
 import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog';
@@ -35,7 +35,7 @@ type ConfirmAction =
   | 'bulkPublish'
   | null;
 
-const defaultFilters = (status: DraftEventStatus): DraftEventFilters => ({
+const defaultFilters = (status: ReviewStatus): DraftEventFilters => ({
   status,
   venueId: '',
   genre: '',
@@ -44,7 +44,7 @@ const defaultFilters = (status: DraftEventStatus): DraftEventFilters => ({
 });
 
 export function DraftEventsPage() {
-  const [activeTab, setActiveTab] = useState<DraftEventStatus>('pending');
+  const [activeTab, setActiveTab] = useState<ReviewStatus>('pending');
   const [filters, setFilters] = useState<DraftEventFilters>(() =>
     defaultFilters('pending'),
   );
@@ -77,7 +77,7 @@ export function DraftEventsPage() {
     [filteredEvents, selectedIds],
   );
 
-  const switchTab = (status: DraftEventStatus) => {
+  const switchTab = (status: ReviewStatus) => {
     setActiveTab(status);
     setFilters(defaultFilters(status));
     setSelectedIds(new Set());
@@ -121,7 +121,7 @@ export function DraftEventsPage() {
   const handleCreate = async (
     data: DraftEventFormData,
     sourceId: string,
-    status: DraftEventStatus,
+    status: ReviewStatus,
   ) => {
     await runWithBusy(async () => {
       await createDraftEvent(data, sourceId, status);
@@ -149,7 +149,7 @@ export function DraftEventsPage() {
     });
   };
 
-  const handleStatusChange = async (status: DraftEventStatus) => {
+  const handleStatusChange = async (status: ReviewStatus) => {
     if (!editingEvent) return;
     await runWithBusy(async () => {
       await updateDraftStatus(editingEvent.id, status);

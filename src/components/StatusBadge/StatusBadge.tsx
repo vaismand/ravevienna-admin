@@ -1,7 +1,7 @@
-import type { DraftEventStatus } from '../../types/database';
+import type { ReviewStatus } from '../../types/database';
 import styles from './StatusBadge.module.css';
 
-const LABELS: Record<DraftEventStatus, string> = {
+const LABELS: Record<ReviewStatus, string> = {
   pending: 'Pending',
   approved: 'Approved',
   rejected: 'Rejected',
@@ -9,7 +9,7 @@ const LABELS: Record<DraftEventStatus, string> = {
 };
 
 interface StatusBadgeProps {
-  status: DraftEventStatus;
+  status: ReviewStatus;
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {

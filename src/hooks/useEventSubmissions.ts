@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { formatPostgrestError } from '../lib/supabaseErrors';
-import type { DraftEvent, ReviewStatus } from '../types/database';
+import type { EventSubmission, ReviewStatus } from '../types/database';
 
 function isPermissionError(message: string): boolean {
   const lower = message.toLowerCase();
@@ -12,8 +12,8 @@ function isPermissionError(message: string): boolean {
   );
 }
 
-export function useDraftEvents(status: ReviewStatus) {
-  const [events, setEvents] = useState<DraftEvent[]>([]);
+export function useEventSubmissions(status: ReviewStatus) {
+  const [submissions, setSubmissions] = useState<EventSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rlsBlocked, setRlsBlocked] = useState(false);
@@ -26,28 +26,28 @@ export function useDraftEvents(status: ReviewStatus) {
 
     const [listRes, totalRes] = await Promise.all([
       supabase
-        .from('draft_events')
-        .select('*', { count: 'exact' })
+        .from('event_submissions')
+        .select('*')
         .eq('status', status)
         .order('event_date', { ascending: true, nullsFirst: false })
         .order('start_time', { ascending: true, nullsFirst: false }),
       supabase
-        .from('draft_events')
+        .from('event_submissions')
         .select('id', { count: 'exact', head: true }),
     ]);
 
     const fetchError = listRes.error ?? totalRes.error;
-    const rows = (listRes.data ?? []) as DraftEvent[];
+    const rows = (listRes.data ?? []) as EventSubmission[];
     const totalCount = totalRes.count;
 
     setTotalInDb(totalCount);
 
     if (fetchError) {
       setError(formatPostgrestError(fetchError));
-      setEvents([]);
+      setSubmissions([]);
       setRlsBlocked(isPermissionError(fetchError.message ?? ''));
     } else {
-      setEvents(rows);
+      setSubmissions(rows);
       const tableLooksEmpty =
         (totalCount === 0 || totalCount === null) &&
         rows.length === 0 &&
@@ -62,5 +62,12 @@ export function useDraftEvents(status: ReviewStatus) {
     void load();
   }, [load]);
 
-  return { events, loading, error, rlsBlocked, totalInDb, reload: load, setEvents };
+  return {
+    submissions,
+    loading,
+    error,
+    rlsBlocked,
+    totalInDb,
+    reload: load,
+  };
 }

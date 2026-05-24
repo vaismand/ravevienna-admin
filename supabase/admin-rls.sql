@@ -65,12 +65,17 @@ CREATE POLICY "Admins update events"
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
 
--- Dedupe published events (recommended)
+-- Dedupe published events (safe to re-run; skips if constraint already exists)
 DO $$ BEGIN
-  ALTER TABLE public.events
-    ADD CONSTRAINT events_source_external_unique UNIQUE (source_id, external_id);
-EXCEPTION
-  WHEN duplicate_object THEN NULL;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'events_source_external_unique'
+      AND conrelid = 'public.events'::regclass
+  ) THEN
+    ALTER TABLE public.events
+      ADD CONSTRAINT events_source_external_unique UNIQUE (source_id, external_id);
+  END IF;
 END $$;
 
 -- venues & event_sources (reference data for filters/cards)
@@ -91,4 +96,28 @@ CREATE POLICY "Admins read event_sources"
 -- Optional: source for hand-entered events (pick in "Add event" form)
 -- INSERT INTO public.event_sources (name, slug)
 -- VALUES ('Manual', 'manual')
+-- ON CONFLICT DO NOTHING;
+
+-- event_submissions (app user submissions)
+ALTER TABLE public.event_submissions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Admins select event_submissions" ON public.event_submissions;
+CREATE POLICY "Admins select event_submissions"
+  ON public.event_submissions FOR SELECT
+  USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Admins update event_submissions" ON public.event_submissions;
+CREATE POLICY "Admins update event_submissions"
+  ON public.event_submissions FOR UPDATE
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS "Admins delete event_submissions" ON public.event_submissions;
+CREATE POLICY "Admins delete event_submissions"
+  ON public.event_submissions FOR DELETE
+  USING (public.is_admin());
+
+-- Optional: source for published user submissions
+-- INSERT INTO public.event_sources (name, slug)
+-- VALUES ('User submission', 'user-submission')
 -- ON CONFLICT DO NOTHING;

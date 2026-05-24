@@ -1,0 +1,42 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a9a9a;
+}
+
+.input {
+  padding: 0.5rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 240, 208, 0.15);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+}
+
+.input:focus {
+  outline: none;
+  border-color: rgba(0, 240, 208, 0.45);
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}

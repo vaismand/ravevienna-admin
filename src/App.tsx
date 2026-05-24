@@ -1,6 +1,6 @@
 import { AccessDenied } from './components/AccessDenied/AccessDenied';
 import { AdminLayout } from './components/AdminLayout/AdminLayout';
-import { DraftEventsPage } from './components/DraftEventsPage/DraftEventsPage';
+import { AdminDashboard } from './components/AdminDashboard/AdminDashboard';
 import { LoginPage } from './components/LoginPage/LoginPage';
 import { NotificationToast } from './components/NotificationToast/NotificationToast';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -24,7 +24,7 @@ function AppContent() {
 
   return (
     <AdminLayout>
-      <DraftEventsPage />
+      <AdminDashboard />
     </AdminLayout>
   );
 }

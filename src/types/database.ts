@@ -1,8 +1,11 @@
-export type DraftEventStatus =
+export type ReviewStatus =
   | 'pending'
   | 'approved'
   | 'rejected'
   | 'published';
+
+/** @deprecated Use ReviewStatus */
+export type DraftEventStatus = ReviewStatus;
 
 export interface Profile {
   id: string;
@@ -42,7 +45,7 @@ export interface DraftEvent {
   image_url: string | null;
   external_url: string | null;
   external_id: string | null;
-  status: DraftEventStatus;
+  status: ReviewStatus;
   confidence: number | null;
   raw_data: Record<string, unknown> | null;
   created_at: string;
@@ -82,10 +85,42 @@ export interface DraftEventFormData {
 }
 
 export interface DraftEventFilters {
-  status: DraftEventStatus | 'all';
+  status: ReviewStatus | 'all';
   venueId: string;
   genre: string;
   sourceId: string;
+  search: string;
+}
+
+export interface EventSubmission {
+  id: string;
+  user_id: string | null;
+  title: string;
+  venue_name: string | null;
+  event_date: string | null;
+  start_time: string | null;
+  genres: string[] | null;
+  event_url: string | null;
+  description: string | null;
+  contact: string | null;
+  status: ReviewStatus;
+  created_at: string;
+}
+
+export interface EventSubmissionFormData {
+  title: string;
+  venue_name: string;
+  event_date: string;
+  start_time: string;
+  genres: string[];
+  event_url: string;
+  description: string;
+  contact: string;
+}
+
+export interface SubmissionFilters {
+  venueName: string;
+  genre: string;
   search: string;
 }
 

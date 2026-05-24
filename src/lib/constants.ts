@@ -1,4 +1,4 @@
-import type { DraftEventStatus } from '../types/database';
+import type { ReviewStatus } from '../types/database';
 
 export const GENRE_OPTIONS = [
   'Techno',
@@ -19,7 +19,7 @@ export const GENRE_OPTIONS = [
   'Electronic',
 ] as const;
 
-export const STATUS_TABS: { key: DraftEventStatus; label: string }[] = [
+export const STATUS_TABS: { key: ReviewStatus; label: string }[] = [
   { key: 'pending', label: 'Pending' },
   { key: 'approved', label: 'Approved' },
   { key: 'rejected', label: 'Rejected' },
