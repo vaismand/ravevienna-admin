@@ -1,3 +1,9 @@
+export function todayInVienna(): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Vienna',
+  }).format(new Date());
+}
+
 export function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—';
   try {
@@ -37,4 +43,10 @@ export function matchesSearch(
   const title = event.title.toLowerCase();
   const desc = (event.description ?? '').toLowerCase();
   return title.includes(q) || desc.includes(q);
+}
+
+/** True when event_date is strictly before today (Vienna). */
+export function isEventDatePast(eventDate: string | null): boolean {
+  if (!eventDate) return false;
+  return eventDate.slice(0, 10) < todayInVienna();
 }

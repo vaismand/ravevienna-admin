@@ -387,9 +387,10 @@ export function DraftEventsPage() {
             ? ' match your filters'
             : ''}
           .
-          {activeTab === 'approved' &&
-            (totalInDb ?? 0) > 0 &&
-            ' Events you publish move to the Published tab.'}
+          {activeTab === 'published' &&
+            ' Upcoming published events (today or later).'}
+          {activeTab === 'passed' &&
+            ' Published events that already took place (before today).'}
           {activeTab === 'pending' &&
             (totalInDb ?? 0) > 0 &&
             ' Try another status tab.'}

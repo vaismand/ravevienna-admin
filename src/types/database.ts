@@ -2,6 +2,7 @@ export type ReviewStatus =
   | 'pending'
   | 'approved'
   | 'rejected'
+  | 'passed'
   | 'published';
 
 /** @deprecated Use ReviewStatus */

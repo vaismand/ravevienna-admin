@@ -5,6 +5,7 @@ const LABELS: Record<ReviewStatus, string> = {
   pending: 'Pending',
   approved: 'Approved',
   rejected: 'Rejected',
+  passed: 'Passed',
   published: 'Published',
 };
 

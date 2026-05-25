@@ -78,6 +78,7 @@
 .approveBtn,
 .rejectBtn,
 .pendingBtn,
+.passedBtn,
 .publishBtn {
   padding: 0.45rem 0.8rem;
   border-radius: 8px;
@@ -90,6 +91,7 @@
 .approveBtn:disabled,
 .rejectBtn:disabled,
 .pendingBtn:disabled,
+.passedBtn:disabled,
 .publishBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -117,6 +119,12 @@
   border-color: rgba(255, 216, 77, 0.4);
   background: transparent;
   color: #ffd84d;
+}
+
+.passedBtn {
+  border-color: rgba(184, 160, 255, 0.4);
+  background: transparent;
+  color: #b8a0ff;
 }
 
 .publishBtn {

@@ -49,7 +49,7 @@ export function SubmissionsPage() {
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
 
   const { notify } = useNotification();
-  const { submissions, loading, error, rlsBlocked, totalInDb, reload } =
+  const { submissions, loading, error, rlsBlocked, meta, reload } =
     useEventSubmissions(activeTab);
   const { venues, sources, loading: refLoading, warning: refWarning } =
     useReferenceData();
@@ -357,26 +357,48 @@ export function SubmissionsPage() {
         <p className={pageStyles.warning}>{refWarning}</p>
       )}
 
-      {!isLoading && !error && rlsBlocked && (
+      {!isLoading && error && rlsBlocked && (
         <div className={pageStyles.rlsBox}>
           <strong>Cannot read event_submissions.</strong>
+          <p>{error}</p>
           <p>
-            Run the event_submissions policies in{' '}
-            <code>supabase/admin-rls.sql</code>, then refresh.
+            Run the event_submissions section in{' '}
+            <code>supabase/admin-rls.sql</code>, then sign out and back in.
           </p>
         </div>
       )}
 
-      {!isLoading && !error && !rlsBlocked && filtered.length === 0 && (
+      {!isLoading && !error && meta.statusMismatch && (
+        <div className={pageStyles.warning}>
+          <strong>Submissions exist but not under “{activeTab}”.</strong>
+          <p>
+            Found {meta.totalAccessible} row(s) in the database with statuses:{' '}
+            {Object.entries(meta.statusBreakdown)
+              .map(([s, n]) => `${s} (${n})`)
+              .join(', ')}
+            . Try another tab, or align your app to use: pending, approved,
+            rejected, published.
+          </p>
+        </div>
+      )}
+
+      {!isLoading &&
+        !error &&
+        !rlsBlocked &&
+        !meta.statusMismatch &&
+        filtered.length === 0 && (
         <p className={pageStyles.state}>
-          No {activeTab} user submissions
+          {meta.totalAccessible === 0
+            ? 'No user submissions in the database yet.'
+            : `No ${activeTab} user submissions`}
           {filters.search || filters.venueName || filters.genre
             ? ' match your filters'
             : ''}
           .
-          {activeTab === 'approved' &&
-            (totalInDb ?? 0) > 0 &&
-            ' Published items move to the Published tab.'}
+          {activeTab === 'published' &&
+            ' Upcoming published events (today or later).'}
+          {activeTab === 'passed' &&
+            ' Published events that already took place (before today).'}
         </p>
       )}
 

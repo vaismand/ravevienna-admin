@@ -24,6 +24,7 @@ export const STATUS_TABS: { key: ReviewStatus; label: string }[] = [
   { key: 'approved', label: 'Approved' },
   { key: 'rejected', label: 'Rejected' },
   { key: 'published', label: 'Published' },
+  { key: 'passed', label: 'Passed' },
 ];
 
 export const COLORS = {

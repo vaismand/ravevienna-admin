@@ -101,6 +101,9 @@ CREATE POLICY "Admins read event_sources"
 -- event_submissions (app user submissions)
 ALTER TABLE public.event_submissions ENABLE ROW LEVEL SECURITY;
 
+GRANT SELECT, UPDATE, DELETE ON public.event_submissions TO authenticated;
+GRANT SELECT, UPDATE, DELETE ON public.event_submissions TO service_role;
+
 DROP POLICY IF EXISTS "Admins select event_submissions" ON public.event_submissions;
 CREATE POLICY "Admins select event_submissions"
   ON public.event_submissions FOR SELECT

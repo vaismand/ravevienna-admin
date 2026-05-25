@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import {
+  passedTabFilter,
+  publishedTabFilter,
+} from '../lib/reviewStatusQuery';
 import { formatPostgrestError } from '../lib/supabaseErrors';
 import type { DraftEvent, ReviewStatus } from '../types/database';
 
@@ -10,6 +14,29 @@ function isPermissionError(message: string): boolean {
     lower.includes('row-level security') ||
     lower.includes('jwt')
   );
+}
+
+function buildListQuery(status: ReviewStatus) {
+  if (status === 'published') {
+    const f = publishedTabFilter();
+    return supabase
+      .from('draft_events')
+      .select('*', { count: 'exact' })
+      .eq('status', f.status)
+      .or(f.dateOr);
+  }
+  if (status === 'passed') {
+    const f = passedTabFilter();
+    return supabase
+      .from('draft_events')
+      .select('*', { count: 'exact' })
+      .eq('status', f.status)
+      .lt('event_date', f.beforeDate);
+  }
+  return supabase
+    .from('draft_events')
+    .select('*', { count: 'exact' })
+    .eq('status', status);
 }
 
 export function useDraftEvents(status: ReviewStatus) {
@@ -25,10 +52,7 @@ export function useDraftEvents(status: ReviewStatus) {
     setRlsBlocked(false);
 
     const [listRes, totalRes] = await Promise.all([
-      supabase
-        .from('draft_events')
-        .select('*', { count: 'exact' })
-        .eq('status', status)
+      buildListQuery(status)
         .order('event_date', { ascending: true, nullsFirst: false })
         .order('start_time', { ascending: true, nullsFirst: false }),
       supabase
