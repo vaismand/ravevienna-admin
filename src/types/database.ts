@@ -42,6 +42,7 @@ export interface DraftEvent {
   price: number | string | null;
   genres: string[] | null;
   description: string | null;
+  lineup: string[] | null;
   ticket_url: string | null;
   image_url: string | null;
   external_url: string | null;
@@ -63,6 +64,7 @@ export interface Event {
   price: number | string | null;
   genres: string[] | null;
   description: string | null;
+  lineup?: string[] | null;
   ticket_url: string | null;
   image_url: string | null;
   external_url: string | null;
@@ -80,6 +82,7 @@ export interface DraftEventFormData {
   price: string;
   genres: string[];
   description: string;
+  lineup: string;
   image_url: string;
   ticket_url: string;
   external_url: string;
@@ -116,6 +119,7 @@ export interface EventSubmissionFormData {
   genres: string[];
   event_url: string;
   description: string;
+  lineup: string;
   contact: string;
 }
 

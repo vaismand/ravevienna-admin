@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import {
   passedTabFilter,
   publishedTabFilter,
+  reviewListSort,
 } from '../lib/reviewStatusQuery';
 import { formatPostgrestError } from '../lib/supabaseErrors';
 import type { EventSubmission, ReviewStatus } from '../types/database';
@@ -64,10 +65,18 @@ export function useEventSubmissions(status: ReviewStatus) {
     setError(null);
     setRlsBlocked(false);
 
+    const sort = reviewListSort(status);
+
     const [listRes, allRes] = await Promise.all([
       buildListQuery(status)
-        .order('event_date', { ascending: true, nullsFirst: false })
-        .order('start_time', { ascending: true, nullsFirst: false }),
+        .order('event_date', {
+          ascending: sort.eventDateAsc,
+          nullsFirst: false,
+        })
+        .order('start_time', {
+          ascending: sort.startTimeAsc,
+          nullsFirst: false,
+        }),
       supabase.from('event_submissions').select('id, status'),
     ]);
 

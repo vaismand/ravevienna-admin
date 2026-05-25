@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { parseLineupText } from './lineup';
 import { formatPostgrestError } from './supabaseErrors';
 import type {
   DraftEvent,
@@ -31,6 +32,7 @@ function buildPublishedEventPayload(draft: DraftEvent) {
     price: normalizePrice(draft.price),
     genres: draft.genres ?? [],
     description: draft.description,
+    lineup: draft.lineup ?? [],
     ticket_url: draft.ticket_url,
     image_url: draft.image_url,
     external_url: draft.external_url,
@@ -47,6 +49,7 @@ export function formDataToUpdatePayload(data: DraftEventFormData) {
     price: parsePrice(data.price),
     genres: data.genres.length > 0 ? data.genres : null,
     description: data.description.trim() || null,
+    lineup: parseLineupText(data.lineup),
     image_url: data.image_url.trim() || null,
     ticket_url: data.ticket_url.trim() || null,
     external_url: data.external_url.trim() || null,

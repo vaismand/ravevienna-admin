@@ -11,6 +11,7 @@ export function submissionToFormData(
     genres: s.genres ?? [],
     event_url: s.event_url ?? '',
     description: s.description ?? '',
+    lineup: '',
     contact: s.contact ?? '',
   };
 }

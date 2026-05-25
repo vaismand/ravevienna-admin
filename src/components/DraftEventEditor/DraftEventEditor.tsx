@@ -4,6 +4,7 @@ import type {
   DraftEventFormData,
   Venue,
 } from '../../types/database';
+import { formatLineupArray } from '../../lib/lineup';
 import { formatPrice } from '../../utils/format';
 import { DraftEventFormFields } from '../DraftEventFormFields/DraftEventFormFields';
 import { StatusBadge } from '../StatusBadge/StatusBadge';
@@ -18,6 +19,7 @@ function toFormData(event: DraftEvent): DraftEventFormData {
     price: formatPrice(event.price).replace(/^€/, '') || '',
     genres: event.genres ?? [],
     description: event.description ?? '',
+    lineup: formatLineupArray(event.lineup),
     image_url: event.image_url ?? '',
     ticket_url: event.ticket_url ?? '',
     external_url: event.external_url ?? '',

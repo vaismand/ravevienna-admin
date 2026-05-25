@@ -127,6 +127,19 @@ export function DraftEventFormFields({
       </label>
 
       <label className={styles.field}>
+        <span className={styles.label}>Lineup</span>
+        <textarea
+          className={`${styles.input} ${styles.textarea}`}
+          rows={4}
+          value={form.lineup}
+          onChange={(e) => update('lineup', e.target.value)}
+          placeholder={
+            'Heimlich Maneuver\nCoop Audio Crew\nJustus Kaya'
+          }
+        />
+      </label>
+
+      <label className={styles.field}>
         <span className={styles.label}>Image URL</span>
         <input
           className={styles.input}

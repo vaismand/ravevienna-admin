@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { parseLineupText } from './lineup';
 import { formatPostgrestError } from './supabaseErrors';
 import { resolveVenueIdFromName } from './venueUtils';
 import type {
@@ -113,6 +114,7 @@ export async function publishEventSubmission(
       payload.description,
       payload.contact,
     ),
+    lineup: parseLineupText(formData.lineup),
     ticket_url: payload.event_url,
     image_url: null,
     external_url: payload.event_url,

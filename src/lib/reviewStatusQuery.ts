@@ -29,3 +29,14 @@ export function passedTabFilter(): {
 export function isDateSplitTab(status: ReviewStatus): boolean {
   return status === 'published' || status === 'passed';
 }
+
+/** Passed tab: newest past events first. Other tabs: soonest first. */
+export function reviewListSort(status: ReviewStatus): {
+  eventDateAsc: boolean;
+  startTimeAsc: boolean;
+} {
+  if (status === 'passed') {
+    return { eventDateAsc: false, startTimeAsc: false };
+  }
+  return { eventDateAsc: true, startTimeAsc: true };
+}
