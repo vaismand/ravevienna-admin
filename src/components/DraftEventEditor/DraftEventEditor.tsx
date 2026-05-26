@@ -6,7 +6,9 @@ import type {
 } from '../../types/database';
 import { formatLineupArray } from '../../lib/lineup';
 import { formatPrice } from '../../utils/format';
+import { useEventDjSelection } from '../../hooks/useEventDjSelection';
 import { DraftEventFormFields } from '../DraftEventFormFields/DraftEventFormFields';
+import { EventDjSelect } from '../EventDjSelect/EventDjSelect';
 import { StatusBadge } from '../StatusBadge/StatusBadge';
 import styles from './DraftEventEditor.module.css';
 
@@ -32,11 +34,11 @@ interface DraftEventEditorProps {
   open: boolean;
   busy: boolean;
   onClose: () => void;
-  onSave: (data: DraftEventFormData) => Promise<void>;
+  onSave: (data: DraftEventFormData, djIds: string[]) => Promise<void>;
   onApprove: () => Promise<void>;
   onReject: () => Promise<void>;
   onPending: () => Promise<void>;
-  onPublish: (data: DraftEventFormData) => Promise<void>;
+  onPublish: (data: DraftEventFormData, djIds: string[]) => Promise<void>;
 }
 
 export function DraftEventEditor({
@@ -52,6 +54,13 @@ export function DraftEventEditor({
   onPublish,
 }: DraftEventEditorProps) {
   const [form, setForm] = useState<DraftEventFormData>(() => toFormData(event));
+  const {
+    activeDjs,
+    selectedDjIds,
+    setSelectedDjIds,
+    loading: djsLoading,
+    hasPublishedEvent,
+  } = useEventDjSelection(open, event.source_id, event.external_id);
 
   useEffect(() => {
     if (open) setForm(toFormData(event));
@@ -84,6 +93,18 @@ export function DraftEventEditor({
             onChange={setForm}
             venues={venues}
           />
+          <EventDjSelect
+            activeDjs={activeDjs}
+            selectedDjIds={selectedDjIds}
+            onChange={setSelectedDjIds}
+            loading={djsLoading}
+          />
+          {!hasPublishedEvent && event.source_id && event.external_id && (
+            <p className={styles.djNote}>
+              DJ links are stored when you publish (or after the event exists in
+              the feed). Selection is kept when you publish from this dialog.
+            </p>
+          )}
         </div>
 
         <footer className={styles.footer}>
@@ -91,7 +112,7 @@ export function DraftEventEditor({
             <button
               type="button"
               className={styles.saveBtn}
-              onClick={() => void onSave(form)}
+              onClick={() => void onSave(form, selectedDjIds)}
               disabled={busy}
             >
               Save changes
@@ -125,7 +146,7 @@ export function DraftEventEditor({
             <button
               type="button"
               className={styles.publishBtn}
-              onClick={() => void onPublish(form)}
+              onClick={() => void onPublish(form, selectedDjIds)}
               disabled={busy}
             >
               Publish

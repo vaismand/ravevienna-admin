@@ -1,0 +1,133 @@
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid rgba(0, 240, 208, 0.12);
+}
+
+.title {
+  margin: 0;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a9a9a;
+}
+
+.hint,
+.muted {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #8a9a9a;
+  line-height: 1.45;
+}
+
+.subLabel {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8a9a9a;
+}
+
+.selectedBlock,
+.availableBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.selectedList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.selectedItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  background: rgba(0, 240, 208, 0.06);
+  border: 1px solid rgba(0, 240, 208, 0.12);
+}
+
+.order {
+  color: #00f0d0;
+  font-size: 0.78rem;
+  min-width: 1.25rem;
+}
+
+.djName {
+  flex: 1;
+  font-size: 0.88rem;
+}
+
+.itemActions {
+  display: flex;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.iconBtn,
+.removeBtn,
+.addBtn {
+  border-radius: 6px;
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+
+.iconBtn {
+  padding: 0.2rem 0.4rem;
+  border: 1px solid rgba(0, 240, 208, 0.2);
+  background: transparent;
+  color: #8a9a9a;
+}
+
+.iconBtn:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(0, 240, 208, 0.4);
+}
+
+.iconBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.removeBtn {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid rgba(255, 107, 107, 0.35);
+  background: transparent;
+  color: #ff8a8a;
+}
+
+.removeBtn:hover:not(:disabled) {
+  background: rgba(255, 107, 107, 0.12);
+}
+
+.availableList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.addBtn {
+  padding: 0.35rem 0.65rem;
+  border: 1px solid rgba(0, 240, 208, 0.25);
+  background: rgba(0, 240, 208, 0.06);
+  color: #00f0d0;
+}
+
+.addBtn:hover:not(:disabled) {
+  background: rgba(0, 240, 208, 0.14);
+}
+
+.addBtn:disabled,
+.removeBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

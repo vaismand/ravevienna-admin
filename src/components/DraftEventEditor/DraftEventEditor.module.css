@@ -132,3 +132,16 @@
   background: rgba(168, 196, 255, 0.08);
   color: #a8c4ff;
 }
+
+.validationError {
+  margin: 0.75rem 0 0;
+  font-size: 0.82rem;
+  color: #ff8a8a;
+}
+
+.djNote {
+  margin: 0.5rem 0 0;
+  font-size: 0.78rem;
+  color: #8a9a9a;
+  line-height: 1.45;
+}

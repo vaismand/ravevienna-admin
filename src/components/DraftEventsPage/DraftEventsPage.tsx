@@ -13,6 +13,7 @@ import {
 import { useNotification } from '../../context/NotificationContext';
 import { useDraftEvents } from '../../hooks/useDraftEvents';
 import { useReferenceData } from '../../hooks/useReferenceData';
+import { syncEventDjsForDraft, updateEventDjs } from '../../lib/eventDjActions';
 import { formatPostgrestError } from '../../lib/supabaseErrors';
 import { matchesSearch } from '../../utils/format';
 import type {
@@ -140,10 +141,19 @@ export function DraftEventsPage() {
     });
   };
 
-  const handleSave = async (data: DraftEventFormData) => {
+  const handleSave = async (data: DraftEventFormData, djIds: string[]) => {
     if (!editingEvent) return;
     await runWithBusy(async () => {
       await saveDraftEvent(editingEvent.id, data);
+      const merged: DraftEvent = {
+        ...editingEvent,
+        ...formDataToUpdatePayload(data),
+      };
+      await syncEventDjsForDraft(
+        merged.source_id,
+        merged.external_id,
+        djIds,
+      );
       notify('Draft event saved.', 'success');
       await refreshAfterAction();
     });
@@ -158,7 +168,7 @@ export function DraftEventsPage() {
     });
   };
 
-  const handlePublish = async (data: DraftEventFormData) => {
+  const handlePublish = async (data: DraftEventFormData, djIds: string[]) => {
     if (!editingEvent) return;
     await runWithBusy(async () => {
       await saveDraftEvent(editingEvent.id, data);
@@ -166,7 +176,8 @@ export function DraftEventsPage() {
         ...editingEvent,
         ...formDataToUpdatePayload(data),
       };
-      await publishDraftEvent(merged);
+      const eventId = await publishDraftEvent(merged);
+      await updateEventDjs(eventId, djIds);
       notify('Event published to mobile feed.', 'success');
       await refreshAfterAction();
     });

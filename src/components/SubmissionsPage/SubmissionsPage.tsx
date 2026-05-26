@@ -14,6 +14,7 @@ import { matchesSubmissionSearch, submissionToFormData } from '../../lib/submiss
 import { useNotification } from '../../context/NotificationContext';
 import { useEventSubmissions } from '../../hooks/useEventSubmissions';
 import { useReferenceData } from '../../hooks/useReferenceData';
+import { syncEventDjsForDraft, updateEventDjs } from '../../lib/eventDjActions';
 import { formatPostgrestError } from '../../lib/supabaseErrors';
 import type {
   EventSubmission,
@@ -119,10 +120,17 @@ export function SubmissionsPage() {
     }
   };
 
-  const handleSave = async (data: EventSubmissionFormData) => {
+  const handleSave = async (data: EventSubmissionFormData, djIds: string[]) => {
     if (!editing) return;
     await runWithBusy(async () => {
       await saveEventSubmission(editing.id, data);
+      if (submissionSourceId) {
+        await syncEventDjsForDraft(
+          submissionSourceId,
+          `submission-${editing.id}`,
+          djIds,
+        );
+      }
       notify('Submission saved.', 'success');
       await refreshAfterAction();
     });
@@ -137,7 +145,7 @@ export function SubmissionsPage() {
     });
   };
 
-  const handlePublish = async (data: EventSubmissionFormData) => {
+  const handlePublish = async (data: EventSubmissionFormData, djIds: string[]) => {
     if (!editing) return;
     if (!submissionSourceId) {
       notify(
@@ -152,12 +160,13 @@ export function SubmissionsPage() {
         ...editing,
         ...submissionFormToPayload(data),
       };
-      await publishEventSubmission(
+      const eventId = await publishEventSubmission(
         merged,
         data,
         venues,
         submissionSourceId,
       );
+      await updateEventDjs(eventId, djIds);
       notify('Submission published to mobile feed.', 'success');
       await refreshAfterAction();
     });
@@ -420,6 +429,7 @@ export function SubmissionsPage() {
         <SubmissionEditor
           submission={editing}
           venues={venues}
+          submissionSourceId={submissionSourceId}
           open={!!editing}
           busy={busy}
           onClose={() => setEditing(null)}

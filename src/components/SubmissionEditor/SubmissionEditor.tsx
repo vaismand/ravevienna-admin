@@ -5,26 +5,30 @@ import type {
   Venue,
 } from '../../types/database';
 import { submissionToFormData } from '../../lib/submissionForm';
+import { useEventDjSelection } from '../../hooks/useEventDjSelection';
 import { SubmissionFormFields } from '../SubmissionFormFields/SubmissionFormFields';
+import { EventDjSelect } from '../EventDjSelect/EventDjSelect';
 import { StatusBadge } from '../StatusBadge/StatusBadge';
 import styles from '../DraftEventEditor/DraftEventEditor.module.css';
 
 interface SubmissionEditorProps {
   submission: EventSubmission;
   venues: Venue[];
+  submissionSourceId: string | null;
   open: boolean;
   busy: boolean;
   onClose: () => void;
-  onSave: (data: EventSubmissionFormData) => Promise<void>;
+  onSave: (data: EventSubmissionFormData, djIds: string[]) => Promise<void>;
   onApprove: () => Promise<void>;
   onReject: () => Promise<void>;
   onPending: () => Promise<void>;
-  onPublish: (data: EventSubmissionFormData) => Promise<void>;
+  onPublish: (data: EventSubmissionFormData, djIds: string[]) => Promise<void>;
 }
 
 export function SubmissionEditor({
   submission,
   venues,
+  submissionSourceId,
   open,
   busy,
   onClose,
@@ -37,6 +41,14 @@ export function SubmissionEditor({
   const [form, setForm] = useState<EventSubmissionFormData>(() =>
     submissionToFormData(submission),
   );
+  const externalId = `submission-${submission.id}`;
+  const {
+    activeDjs,
+    selectedDjIds,
+    setSelectedDjIds,
+    loading: djsLoading,
+    hasPublishedEvent,
+  } = useEventDjSelection(open, submissionSourceId, externalId);
 
   useEffect(() => {
     if (open) setForm(submissionToFormData(submission));
@@ -65,6 +77,18 @@ export function SubmissionEditor({
 
         <div className={styles.formScroll}>
           <SubmissionFormFields form={form} onChange={setForm} venues={venues} />
+          <EventDjSelect
+            activeDjs={activeDjs}
+            selectedDjIds={selectedDjIds}
+            onChange={setSelectedDjIds}
+            loading={djsLoading}
+          />
+          {!hasPublishedEvent && submissionSourceId && (
+            <p className={styles.djNote}>
+              DJ links are saved when you publish this submission to the events
+              feed.
+            </p>
+          )}
         </div>
 
         <footer className={styles.footer}>
@@ -72,7 +96,7 @@ export function SubmissionEditor({
             <button
               type="button"
               className={styles.saveBtn}
-              onClick={() => void onSave(form)}
+              onClick={() => void onSave(form, selectedDjIds)}
               disabled={busy}
             >
               Save changes
@@ -106,7 +130,7 @@ export function SubmissionEditor({
             <button
               type="button"
               className={styles.publishBtn}
-              onClick={() => void onPublish(form)}
+              onClick={() => void onPublish(form, selectedDjIds)}
               disabled={busy}
             >
               Publish

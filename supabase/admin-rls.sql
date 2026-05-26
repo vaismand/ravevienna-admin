@@ -124,3 +124,55 @@ CREATE POLICY "Admins delete event_submissions"
 -- INSERT INTO public.event_sources (name, slug)
 -- VALUES ('User submission', 'user-submission')
 -- ON CONFLICT DO NOTHING;
+
+-- djs (admin CRUD for mobile DJ directory)
+ALTER TABLE public.djs ENABLE ROW LEVEL SECURITY;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.djs TO authenticated;
+
+DROP POLICY IF EXISTS "Admins select djs" ON public.djs;
+CREATE POLICY "Admins select djs"
+  ON public.djs FOR SELECT
+  USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Admins insert djs" ON public.djs;
+CREATE POLICY "Admins insert djs"
+  ON public.djs FOR INSERT
+  WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS "Admins update djs" ON public.djs;
+CREATE POLICY "Admins update djs"
+  ON public.djs FOR UPDATE
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS "Admins delete djs" ON public.djs;
+CREATE POLICY "Admins delete djs"
+  ON public.djs FOR DELETE
+  USING (public.is_admin());
+
+-- event_djs (link DJs to published events; events.id is TEXT)
+ALTER TABLE public.event_djs ENABLE ROW LEVEL SECURITY;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.event_djs TO authenticated;
+
+DROP POLICY IF EXISTS "Admins select event_djs" ON public.event_djs;
+CREATE POLICY "Admins select event_djs"
+  ON public.event_djs FOR SELECT
+  USING (public.is_admin());
+
+DROP POLICY IF EXISTS "Admins insert event_djs" ON public.event_djs;
+CREATE POLICY "Admins insert event_djs"
+  ON public.event_djs FOR INSERT
+  WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS "Admins update event_djs" ON public.event_djs;
+CREATE POLICY "Admins update event_djs"
+  ON public.event_djs FOR UPDATE
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
+
+DROP POLICY IF EXISTS "Admins delete event_djs" ON public.event_djs;
+CREATE POLICY "Admins delete event_djs"
+  ON public.event_djs FOR DELETE
+  USING (public.is_admin());

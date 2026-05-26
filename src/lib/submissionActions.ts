@@ -97,7 +97,7 @@ export async function publishEventSubmission(
   formData: EventSubmissionFormData,
   venues: Venue[],
   sourceId: string,
-): Promise<void> {
+): Promise<string> {
   const payload = submissionFormToPayload(formData);
   const venue_id = resolveVenueIdFromName(payload.venue_name, venues);
   const external_id = `submission-${submission.id}`;
@@ -130,17 +130,23 @@ export async function publishEventSubmission(
 
   if (findError) throw new Error(formatPostgrestError(findError));
 
+  let eventId: string;
+
   if (existing?.id) {
     const { error: updateError } = await supabase
       .from('events')
       .update(eventPayload)
       .eq('id', existing.id);
     if (updateError) throw new Error(formatPostgrestError(updateError));
+    eventId = existing.id;
   } else {
-    const { error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await supabase
       .from('events')
-      .insert(eventPayload);
+      .insert(eventPayload)
+      .select('id')
+      .single();
     if (insertError) throw new Error(formatPostgrestError(insertError));
+    eventId = inserted.id as string;
   }
 
   const { error: statusError } = await supabase
@@ -149,6 +155,8 @@ export async function publishEventSubmission(
     .eq('id', submission.id);
 
   if (statusError) throw new Error(formatPostgrestError(statusError));
+
+  return eventId;
 }
 
 export async function bulkPublishSubmissions(

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { DraftEventsPage } from '../DraftEventsPage/DraftEventsPage';
+import { DjsPage } from '../DjsPage/DjsPage';
 import { SubmissionsPage } from '../SubmissionsPage/SubmissionsPage';
 import styles from './AdminDashboard.module.css';
 
-type MainSection = 'drafts' | 'submissions';
+type MainSection = 'drafts' | 'submissions' | 'djs';
 
 export function AdminDashboard() {
   const [section, setSection] = useState<MainSection>('drafts');
@@ -25,9 +26,18 @@ export function AdminDashboard() {
         >
           User submissions
         </button>
+        <button
+          type="button"
+          className={`${styles.navBtn} ${section === 'djs' ? styles.navActive : ''}`}
+          onClick={() => setSection('djs')}
+        >
+          DJs
+        </button>
       </nav>
 
-      {section === 'drafts' ? <DraftEventsPage /> : <SubmissionsPage />}
+      {section === 'drafts' && <DraftEventsPage />}
+      {section === 'submissions' && <SubmissionsPage />}
+      {section === 'djs' && <DjsPage />}
     </div>
   );
 }

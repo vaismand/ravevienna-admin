@@ -133,3 +133,49 @@ export type ReferenceMaps = {
   venues: Map<string, Venue>;
   sources: Map<string, EventSource>;
 };
+
+export interface Dj {
+  id: string;
+  name: string;
+  slug: string;
+  bio?: string | null;
+  genres: string[];
+  instagram_url?: string | null;
+  soundcloud_url?: string | null;
+  spotify_url?: string | null;
+  website_url?: string | null;
+  image_url?: string | null;
+  city?: string | null;
+  country?: string | null;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface EventDj {
+  id: string;
+  event_id: string;
+  dj_id: string;
+  position: number;
+  created_at?: string;
+}
+
+export interface DjFormData {
+  name: string;
+  slug: string;
+  bio: string;
+  genres: string[];
+  instagram_url: string;
+  soundcloud_url: string;
+  spotify_url: string;
+  website_url: string;
+  image_url: string;
+  city: string;
+  country: string;
+  is_active: boolean;
+}
+
+export interface DjFilters {
+  search: string;
+  active: 'all' | 'active' | 'inactive';
+}

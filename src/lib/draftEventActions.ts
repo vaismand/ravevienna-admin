@@ -123,7 +123,7 @@ export async function updateDraftStatus(
  * Publish draft → events using select-then-insert/update (works without upsert constraint).
  * Matches draft_events columns only (no draft_event_id — add column + field if needed).
  */
-export async function publishDraftEvent(draft: DraftEvent): Promise<void> {
+export async function publishDraftEvent(draft: DraftEvent): Promise<string> {
   if (!draft.source_id || !draft.external_id) {
     throw new Error(
       'Cannot publish: source_id and external_id are required.',
@@ -143,6 +143,8 @@ export async function publishDraftEvent(draft: DraftEvent): Promise<void> {
     throw new Error(formatPostgrestError(findError));
   }
 
+  let eventId: string;
+
   if (existing?.id) {
     const { error: updateError } = await supabase
       .from('events')
@@ -152,14 +154,18 @@ export async function publishDraftEvent(draft: DraftEvent): Promise<void> {
     if (updateError) {
       throw new Error(formatPostgrestError(updateError));
     }
+    eventId = existing.id;
   } else {
-    const { error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await supabase
       .from('events')
-      .insert(payload);
+      .insert(payload)
+      .select('id')
+      .single();
 
     if (insertError) {
       throw new Error(formatPostgrestError(insertError));
     }
+    eventId = inserted.id as string;
   }
 
   const { error: statusError } = await supabase
@@ -170,6 +176,8 @@ export async function publishDraftEvent(draft: DraftEvent): Promise<void> {
   if (statusError) {
     throw new Error(formatPostgrestError(statusError));
   }
+
+  return eventId;
 }
 
 export async function bulkUpdateStatus(
