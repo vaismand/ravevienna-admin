@@ -12,6 +12,7 @@
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
@@ -27,7 +28,9 @@ import { normalizeSpotifyGenres } from "./lib/normalizeSpotifyGenres.ts";
 loadScriptEnv();
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const REVIEW_CSV_PATH = join(__dirname, "output", "dj-enrichment-review.csv");
+const REVIEW_CSV_PATH = process.env.VERCEL
+  ? join(tmpdir(), "dj-enrichment-review.csv")
+  : join(__dirname, "output", "dj-enrichment-review.csv");
 
 const MIGRATION_SQL = `-- Optional Spotify enrichment columns for public.djs
 alter table public.djs
@@ -437,8 +440,8 @@ function printDryRunLine(params: {
   );
 }
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
+async function main(argv: string[] = process.argv.slice(2)) {
+  const options = parseArgs(argv);
 
   const supabaseUrl = requireEnv("SUPABASE_URL");
   const supabaseKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
@@ -626,7 +629,19 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+export async function runEnrichDjsSpotify(
+  argv: string[] = process.argv.slice(2)
+): Promise<void> {
+  await main(argv);
+}
+
+const isDirectRun =
+  typeof process.argv[1] === "string" &&
+  fileURLToPath(import.meta.url) === fileURLToPath(process.argv[1]);
+
+if (isDirectRun) {
+  runEnrichDjsSpotify().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

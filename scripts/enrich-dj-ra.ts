@@ -12,6 +12,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { loadScriptEnv } from "./lib/loadEnv.ts";
@@ -541,8 +542,8 @@ async function createDj(
   return data as DjRow;
 }
 
-async function main() {
-  const options = parseArgs(process.argv.slice(2));
+async function main(argv: string[] = process.argv.slice(2)) {
+  const options = parseArgs(argv);
   const supabaseUrl = requireEnv("SUPABASE_URL");
   const supabaseKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
 
@@ -616,7 +617,19 @@ async function main() {
   console.log(`\n[updated] ${dj.name} (${dj.id}) — ${Object.keys(updates).length} field(s)`);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+export async function runEnrichDjRa(
+  argv: string[] = process.argv.slice(2)
+): Promise<void> {
+  await main(argv);
+}
+
+const isDirectRun =
+  typeof process.argv[1] === "string" &&
+  fileURLToPath(import.meta.url) === fileURLToPath(process.argv[1]);
+
+if (isDirectRun) {
+  runEnrichDjRa().catch((error) => {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+  });
+}

@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { fileURLToPath } from "node:url";
 
 import { loadScriptEnv } from "../../scripts/lib/loadEnv.ts";
 import { normalizeEventGenres } from "../../scripts/lib/genres.ts";
@@ -213,8 +214,6 @@ async function upsertDraftEvents(source: ScrapeSource, events: ScrapedEvent[]) {
   );
 }
 
-/* ----------------------------- ENTRY POINT ----------------------------- */
-
 async function main() {
   const { data: sources, error } = await supabase
     .from("event_sources")
@@ -223,8 +222,7 @@ async function main() {
     .eq("source_type", "website");
 
   if (error) {
-    console.error(error);
-    process.exit(1);
+    throw error;
   }
 
   for (const source of sources ?? []) {
@@ -248,7 +246,17 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+export async function runScrape(): Promise<void> {
+  await main();
+}
+
+const isDirectRun =
+  typeof process.argv[1] === "string" &&
+  fileURLToPath(import.meta.url) === fileURLToPath(process.argv[1]);
+
+if (isDirectRun) {
+  runScrape().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}

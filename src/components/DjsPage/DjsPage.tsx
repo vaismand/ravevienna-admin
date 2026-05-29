@@ -194,9 +194,10 @@ export function DjsPage() {
 
       {scriptApiConfigured === false && (
         <p className={styles.scriptHint}>
-          Script runner unavailable. Add service role credentials to{' '}
-          <code>.env.scripts</code> (and Spotify keys for enrichment), then
-          restart <code>npm run dev</code>.
+          Script runner unavailable. For local dev, use <code>.env.scripts</code>.
+          On Vercel, add <code>SUPABASE_URL</code>,{' '}
+          <code>SUPABASE_SERVICE_ROLE_KEY</code>, and Spotify keys in Project
+          Settings, then redeploy.
         </p>
       )}
 

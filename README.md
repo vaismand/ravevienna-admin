@@ -39,6 +39,25 @@ Create an admin user in Supabase Auth and set `profiles.role = 'admin'` for that
 
 Row Level Security policies for admin access are in `supabase/admin-rls.sql` — run that in the Supabase SQL Editor if reads or writes fail.
 
+## Deploying on Vercel
+
+The admin UI and script buttons share one deployment. Add these in **Vercel → Project → Settings → Environment Variables** (Production and Preview):
+
+| Variable | Required for | Notes |
+|----------|--------------|-------|
+| `VITE_SUPABASE_URL` | Admin UI | Browser-safe |
+| `VITE_SUPABASE_ANON_KEY` | Admin UI | Browser-safe |
+| `SUPABASE_URL` | Script buttons | Same project URL as above; **no** `VITE_` prefix |
+| `SUPABASE_SERVICE_ROLE_KEY` | Script buttons | Server-only secret; never prefix with `VITE_` |
+| `SPOTIFY_CLIENT_ID` | Spotify enrichment | Server-only |
+| `SPOTIFY_CLIENT_SECRET` | Spotify enrichment | Server-only |
+
+After adding or changing server env vars, **redeploy** the project.
+
+Script buttons call Vercel serverless functions (`/api/scripts/run`). The venue scraper can take several minutes — on **Pro**, functions are configured for up to **300s**. Hobby plan timeouts are much shorter and may kill long scrapes early.
+
+For local development, keep secrets in `.env.scripts` instead (see below).
+
 ## Scripts
 
 ```bash
@@ -50,7 +69,7 @@ npm run preview  # preview production build
 
 ### Server-side CLI (admin tools)
 
-These use the **service role key** — keep them in `.env.scripts` (see `.env.scripts.example`). Never put the service role in `VITE_*` vars.
+These use the **service role key** — keep them in `.env.scripts` locally (see `.env.scripts.example`). On Vercel, set the same values as project env vars (see **Deploying on Vercel** above). Never put the service role in `VITE_*` vars.
 
 ```bash
 cp .env.scripts.example .env.scripts   # then fill in keys

@@ -355,9 +355,10 @@ export function DraftEventsPage() {
 
       {scriptApiConfigured === false && (
         <p className={styles.scriptHint}>
-          Script runner unavailable. Add SUPABASE_URL and
-          SUPABASE_SERVICE_ROLE_KEY to <code>.env.scripts</code>, then restart{' '}
-          <code>npm run dev</code>.
+          Script runner unavailable. For local dev, add{' '}
+          <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code>{' '}
+          to <code>.env.scripts</code> and restart <code>npm run dev</code>. On
+          Vercel, add the same server env vars in Project Settings and redeploy.
         </p>
       )}
 

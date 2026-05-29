@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   fetchScriptHealth,
-  startScriptJob,
-  waitForScriptJob,
+  runScriptJob,
   type ScriptId,
   type ScriptJob,
 } from '../lib/scriptRunnerApi';
@@ -16,10 +15,6 @@ export function useScriptRunner() {
     void fetchScriptHealth()
       .then((health) => {
         setConfigured(health.configured);
-        if (health.activeJob) {
-          setJob(health.activeJob);
-          setRunning(health.activeJob.status === 'running');
-        }
       })
       .catch(() => {
         setConfigured(false);
@@ -29,15 +24,33 @@ export function useScriptRunner() {
   const runScript = useCallback(
     async (scriptId: ScriptId, args: string[] = []) => {
       setRunning(true);
-      setJob(null);
+      setJob({
+        id: 'pending',
+        scriptId,
+        status: 'running',
+        output: 'Starting script…',
+        exitCode: null,
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+      });
 
       try {
-        const started = await startScriptJob(scriptId, args);
-        setJob(started);
-
-        const finished = await waitForScriptJob(started.id, setJob);
+        const finished = await runScriptJob(scriptId, args);
         setJob(finished);
         return finished;
+      } catch (error) {
+        const failedJob: ScriptJob = {
+          id: 'failed',
+          scriptId,
+          status: 'failed',
+          output:
+            error instanceof Error ? error.message : 'Script failed to start.',
+          exitCode: 1,
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+        };
+        setJob(failedJob);
+        throw error;
       } finally {
         setRunning(false);
       }

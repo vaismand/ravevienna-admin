@@ -43,7 +43,7 @@ export async function fetchScriptHealth(): Promise<{
   return parseJson(response);
 }
 
-export async function startScriptJob(
+export async function runScriptJob(
   scriptId: ScriptId,
   args: string[] = [],
 ): Promise<ScriptJob> {
@@ -55,30 +55,4 @@ export async function startScriptJob(
 
   const payload = await parseJson<{ job: ScriptJob }>(response);
   return payload.job;
-}
-
-export async function fetchScriptJob(jobId: string): Promise<ScriptJob> {
-  const response = await fetch(`/api/scripts/jobs/${jobId}`, {
-    headers: await authHeaders(),
-  });
-
-  const payload = await parseJson<{ job: ScriptJob }>(response);
-  return payload.job;
-}
-
-export async function waitForScriptJob(
-  jobId: string,
-  onUpdate?: (job: ScriptJob) => void,
-  pollMs = 1000,
-): Promise<ScriptJob> {
-  while (true) {
-    const job = await fetchScriptJob(jobId);
-    onUpdate?.(job);
-
-    if (job.status !== 'running') {
-      return job;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, pollMs));
-  }
 }
