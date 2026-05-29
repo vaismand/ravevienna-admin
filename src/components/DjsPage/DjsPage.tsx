@@ -8,15 +8,24 @@ import {
 import { matchesDjSearch } from '../../lib/djUtils';
 import { useDjs } from '../../hooks/useDjs';
 import { useNotification } from '../../context/NotificationContext';
+import { useScriptRunner } from '../../hooks/useScriptRunner';
 import { formatPostgrestError } from '../../lib/supabaseErrors';
 import type { Dj, DjFilters, DjFormData } from '../../types/database';
 import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog';
 import { DjCard } from '../DjCard/DjCard';
 import { DjEditor } from '../DjEditor/DjEditor';
 import { DjFiltersBar } from '../DjFiltersBar/DjFiltersBar';
+import {
+  buildRaEnrichArgs,
+  RaEnrichModal,
+  type RaEnrichFormData,
+} from '../RaEnrichModal/RaEnrichModal';
+import { ScriptOutputPanel } from '../ScriptOutputPanel/ScriptOutputPanel';
 import styles from './DjsPage.module.css';
 
 const defaultFilters: DjFilters = { search: '', active: 'all' };
+
+type ConfirmAction = 'enrichSpotify' | null;
 
 export function DjsPage() {
   const { djs, loading, error, reload } = useDjs();
@@ -26,6 +35,16 @@ export function DjsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Dj | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [raModalOpen, setRaModalOpen] = useState(false);
+
+  const {
+    configured: scriptApiConfigured,
+    running: scriptRunning,
+    job: scriptJob,
+    runScript,
+    clearJob,
+  } = useScriptRunner();
 
   const filteredDjs = useMemo(() => {
     return djs.filter((dj) => {
@@ -83,6 +102,51 @@ export function DjsPage() {
     });
   };
 
+  const handleScriptFinished = async (
+    label: string,
+    finished: Awaited<ReturnType<typeof runScript>>,
+  ) => {
+    if (finished.status === 'completed') {
+      notify(`${label} finished. Refreshing DJs…`, 'success');
+      await reload();
+    } else {
+      notify(`${label} finished with errors. See output below.`, 'error');
+    }
+  };
+
+  const executeEnrichSpotify = async () => {
+    setConfirmAction(null);
+    try {
+      const finished = await runScript('enrich-spotify');
+      await handleScriptFinished('Spotify enrichment', finished);
+    } catch (err) {
+      notify(
+        err instanceof Error ? err.message : 'Spotify enrichment failed to start.',
+        'error',
+      );
+    }
+  };
+
+  const handleRaEnrich = async (data: RaEnrichFormData) => {
+    try {
+      const finished = await runScript('enrich-ra', buildRaEnrichArgs(data));
+      setRaModalOpen(false);
+      await handleScriptFinished('RA enrichment', finished);
+    } catch (err) {
+      notify(
+        err instanceof Error ? err.message : 'RA enrichment failed to start.',
+        'error',
+      );
+    }
+  };
+
+  const scriptPanelTitle =
+    scriptJob?.scriptId === 'enrich-spotify'
+      ? 'Spotify DJ enrichment'
+      : scriptJob?.scriptId === 'enrich-ra'
+        ? 'RA DJ enrichment'
+        : 'Admin script';
+
   return (
     <div className={styles.page}>
       <p className={styles.sectionHint}>
@@ -92,14 +156,58 @@ export function DjsPage() {
 
       <div className={styles.toolbar}>
         <DjFiltersBar filters={filters} onChange={setFilters} />
-        <button
-          type="button"
-          className={styles.addBtn}
-          onClick={() => setCreateOpen(true)}
-        >
-          + Add DJ
-        </button>
+        <div className={styles.toolbarActions}>
+          <button
+            type="button"
+            className={styles.scriptBtn}
+            disabled={scriptRunning || scriptApiConfigured === false}
+            title={
+              scriptApiConfigured === false
+                ? 'Configure .env.scripts and restart npm run dev'
+                : undefined
+            }
+            onClick={() => setConfirmAction('enrichSpotify')}
+          >
+            {scriptRunning && scriptJob?.scriptId === 'enrich-spotify'
+              ? 'Spotify running…'
+              : 'Enrich from Spotify'}
+          </button>
+          <button
+            type="button"
+            className={styles.scriptBtn}
+            disabled={scriptRunning || scriptApiConfigured === false}
+            onClick={() => setRaModalOpen(true)}
+          >
+            {scriptRunning && scriptJob?.scriptId === 'enrich-ra'
+              ? 'RA running…'
+              : 'Enrich from RA'}
+          </button>
+          <button
+            type="button"
+            className={styles.addBtn}
+            onClick={() => setCreateOpen(true)}
+          >
+            + Add DJ
+          </button>
+        </div>
       </div>
+
+      {scriptApiConfigured === false && (
+        <p className={styles.scriptHint}>
+          Script runner unavailable. Add service role credentials to{' '}
+          <code>.env.scripts</code> (and Spotify keys for enrichment), then
+          restart <code>npm run dev</code>.
+        </p>
+      )}
+
+      {scriptJob && (
+        <ScriptOutputPanel
+          title={scriptPanelTitle}
+          output={scriptJob.output}
+          status={scriptJob.status}
+          onClose={clearJob}
+        />
+      )}
 
       {error && <p className={styles.error}>{error}</p>}
       {loading && <p className={styles.loading}>Loading DJs…</p>}
@@ -150,6 +258,22 @@ export function DjsPage() {
         variant="danger"
         onConfirm={() => void handleDelete()}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmAction === 'enrichSpotify'}
+        title="Run Spotify enrichment?"
+        message="Match DJs against Spotify and update profiles where confidence is high enough. This writes to Supabase for matched DJs."
+        confirmLabel="Run enrichment"
+        onConfirm={() => void executeEnrichSpotify()}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      <RaEnrichModal
+        open={raModalOpen}
+        busy={scriptRunning}
+        onClose={() => setRaModalOpen(false)}
+        onRun={(data) => void handleRaEnrich(data)}
       />
     </div>
   );

@@ -1,0 +1,84 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 240, 208, 0.18);
+  background: rgba(3, 10, 10, 0.85);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.badge {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.running {
+  color: #ffd166;
+  border-color: rgba(255, 209, 102, 0.35);
+  background: rgba(255, 209, 102, 0.1);
+}
+
+.completed {
+  color: #00f0d0;
+  border-color: rgba(0, 240, 208, 0.35);
+  background: rgba(0, 240, 208, 0.1);
+}
+
+.failed {
+  color: #ff8a8a;
+  border-color: rgba(255, 138, 138, 0.35);
+  background: rgba(255, 138, 138, 0.1);
+}
+
+.closeBtn {
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(138, 154, 154, 0.35);
+  background: transparent;
+  color: #8a9a9a;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.closeBtn:hover {
+  color: #fff;
+  border-color: rgba(0, 240, 208, 0.35);
+}
+
+.output {
+  margin: 0;
+  max-height: 280px;
+  overflow: auto;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #c8d6d6;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

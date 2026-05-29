@@ -48,6 +48,22 @@ npm run build    # production build
 npm run preview  # preview production build
 ```
 
+### Server-side CLI (admin tools)
+
+These use the **service role key** — keep them in `.env.scripts` (see `.env.scripts.example`). Never put the service role in `VITE_*` vars.
+
+```bash
+cp .env.scripts.example .env.scripts   # then fill in keys
+
+npm run scrape                        # scrape venue sites → draft_events
+npm run scrape:restore-drafts         # fix draft status after bad scrape run
+npm run scrape:publish-approved       # publish approved drafts to events
+npm run enrich:djs -- --dry-run       # Spotify enrichment (bulk)
+npm run enrich:dj:ra -- --url "…" --name "…" --dry-run   # RA enrichment (single DJ)
+```
+
+See [docs/enrich-dj-ra.md](docs/enrich-dj-ra.md) for RA enrichment details.
+
 ## Database tables used
 
 - `draft_events` — scraped and manual drafts for review

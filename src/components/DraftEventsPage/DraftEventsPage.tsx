@@ -13,6 +13,7 @@ import {
 import { useNotification } from '../../context/NotificationContext';
 import { useDraftEvents } from '../../hooks/useDraftEvents';
 import { useReferenceData } from '../../hooks/useReferenceData';
+import { useScriptRunner } from '../../hooks/useScriptRunner';
 import { syncEventDjsForDraft, updateEventDjs } from '../../lib/eventDjActions';
 import { formatPostgrestError } from '../../lib/supabaseErrors';
 import { matchesSearch } from '../../utils/format';
@@ -27,6 +28,7 @@ import { ConfirmDialog } from '../ConfirmDialog/ConfirmDialog';
 import { DraftEventCard } from '../DraftEventCard/DraftEventCard';
 import { DraftEventEditor } from '../DraftEventEditor/DraftEventEditor';
 import { FiltersBar } from '../FiltersBar/FiltersBar';
+import { ScriptOutputPanel } from '../ScriptOutputPanel/ScriptOutputPanel';
 import styles from './DraftEventsPage.module.css';
 
 type ConfirmAction =
@@ -34,6 +36,7 @@ type ConfirmAction =
   | 'bulkReject'
   | 'bulkDelete'
   | 'bulkPublish'
+  | 'runScraper'
   | null;
 
 const defaultFilters = (status: ReviewStatus): DraftEventFilters => ({
@@ -60,6 +63,13 @@ export function DraftEventsPage() {
     useDraftEvents(activeTab);
   const { venues, sources, maps, loading: refLoading, warning: refWarning } =
     useReferenceData();
+  const {
+    configured: scriptApiConfigured,
+    running: scriptRunning,
+    job: scriptJob,
+    runScript,
+    clearJob,
+  } = useScriptRunner();
 
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
@@ -240,6 +250,24 @@ export function DraftEventsPage() {
     setConfirmAction(null);
   };
 
+  const executeRunScraper = async () => {
+    setConfirmAction(null);
+    try {
+      const finished = await runScript('scrape');
+      if (finished.status === 'completed') {
+        notify('Scraper finished. Refreshing draft events…', 'success');
+        await reload();
+      } else {
+        notify('Scraper finished with errors. See output below.', 'error');
+      }
+    } catch (err) {
+      notify(
+        err instanceof Error ? err.message : 'Scraper failed to start.',
+        'error',
+      );
+    }
+  };
+
   const confirmConfig = {
     bulkApprove: {
       title: 'Approve selected events?',
@@ -269,6 +297,14 @@ export function DraftEventsPage() {
       variant: 'default' as const,
       onConfirm: () => void executeBulkPublish(),
     },
+    runScraper: {
+      title: 'Run venue scraper?',
+      message:
+        'Fetch events from active venue websites and upsert pending draft_events. Approved, published, and rejected drafts are left unchanged.',
+      confirmLabel: 'Run scraper',
+      variant: 'default' as const,
+      onConfirm: () => void executeRunScraper(),
+    },
   };
 
   const activeConfirm = confirmAction ? confirmConfig[confirmAction] : null;
@@ -293,14 +329,46 @@ export function DraftEventsPage() {
           </button>
         ))}
         </div>
-        <button
-          type="button"
-          className={styles.addEventBtn}
-          onClick={() => setCreateOpen(true)}
-        >
-          + Add event
-        </button>
+        <div className={styles.tabsActions}>
+          <button
+            type="button"
+            className={styles.scriptBtn}
+            disabled={scriptRunning || scriptApiConfigured === false}
+            title={
+              scriptApiConfigured === false
+                ? 'Configure .env.scripts and restart npm run dev'
+                : undefined
+            }
+            onClick={() => setConfirmAction('runScraper')}
+          >
+            {scriptRunning ? 'Scraper running…' : 'Run scraper'}
+          </button>
+          <button
+            type="button"
+            className={styles.addEventBtn}
+            onClick={() => setCreateOpen(true)}
+          >
+            + Add event
+          </button>
+        </div>
       </div>
+
+      {scriptApiConfigured === false && (
+        <p className={styles.scriptHint}>
+          Script runner unavailable. Add SUPABASE_URL and
+          SUPABASE_SERVICE_ROLE_KEY to <code>.env.scripts</code>, then restart{' '}
+          <code>npm run dev</code>.
+        </p>
+      )}
+
+      {scriptJob && (
+        <ScriptOutputPanel
+          title="Venue scraper"
+          output={scriptJob.output}
+          status={scriptJob.status}
+          onClose={clearJob}
+        />
+      )}
 
       <FiltersBar
         filters={filters}

@@ -1,0 +1,90 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+  padding: 1rem;
+}
+
+.dialog {
+  width: min(480px, 100%);
+  padding: 1.25rem 1.35rem;
+  border-radius: 14px;
+  background: rgba(3, 10, 10, 0.98);
+  border: 1px solid rgba(0, 240, 208, 0.2);
+}
+
+.title {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  color: #fff;
+}
+
+.hint {
+  margin: 0 0 1rem;
+  color: #8a9a9a;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.82rem;
+  color: #c8d6d6;
+}
+
+.field input {
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(138, 154, 154, 0.35);
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+  font-size: 0.82rem;
+  color: #c8d6d6;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.cancelBtn,
+.runBtn {
+  padding: 0.5rem 0.9rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.cancelBtn {
+  border: 1px solid rgba(138, 154, 154, 0.35);
+  background: transparent;
+  color: #8a9a9a;
+}
+
+.runBtn {
+  border: 1px solid rgba(0, 240, 208, 0.45);
+  background: rgba(0, 240, 208, 0.12);
+  color: #00f0d0;
+}
+
+.cancelBtn:disabled,
+.runBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

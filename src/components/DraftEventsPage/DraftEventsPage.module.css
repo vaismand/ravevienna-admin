@@ -19,6 +19,46 @@
   gap: 0.75rem;
 }
 
+.tabsActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.scriptBtn {
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(138, 154, 154, 0.35);
+  background: rgba(3, 10, 10, 0.6);
+  color: #c8d6d6;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scriptBtn:hover:not(:disabled) {
+  border-color: rgba(0, 240, 208, 0.35);
+  color: #fff;
+}
+
+.scriptBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.scriptHint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #ffd166;
+  line-height: 1.45;
+}
+
+.scriptHint code {
+  font-size: 0.78rem;
+}
+
 .tabs {
   display: flex;
   flex-wrap: wrap;
