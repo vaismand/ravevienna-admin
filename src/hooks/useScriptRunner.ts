@@ -2,23 +2,18 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   fetchScriptHealth,
   runScriptJob,
+  type ScriptHealth,
   type ScriptId,
   type ScriptJob,
 } from '../lib/scriptRunnerApi';
 
 export function useScriptRunner() {
-  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [health, setHealth] = useState<ScriptHealth | null>(null);
   const [running, setRunning] = useState(false);
   const [job, setJob] = useState<ScriptJob | null>(null);
 
   useEffect(() => {
-    void fetchScriptHealth()
-      .then((health) => {
-        setConfigured(health.configured);
-      })
-      .catch(() => {
-        setConfigured(false);
-      });
+    void fetchScriptHealth().then(setHealth);
   }, []);
 
   const runScript = useCallback(
@@ -65,7 +60,9 @@ export function useScriptRunner() {
   }, [running]);
 
   return {
-    configured,
+    configured: health?.configured ?? null,
+    missingEnv: health?.missingEnv ?? [],
+    apiError: health?.apiError ?? null,
     running,
     job,
     runScript,

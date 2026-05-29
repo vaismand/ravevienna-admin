@@ -14,6 +14,13 @@ export type ScriptJob = {
   finishedAt: string | null;
 };
 
+export type ScriptHealth = {
+  configured: boolean;
+  activeJob: ScriptJob | null;
+  missingEnv?: string[];
+  apiError?: string;
+};
+
 async function authHeaders(): Promise<HeadersInit> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -35,12 +42,25 @@ async function parseJson<T>(response: Response): Promise<T> {
   return payload;
 }
 
-export async function fetchScriptHealth(): Promise<{
-  configured: boolean;
-  activeJob: ScriptJob | null;
-}> {
-  const response = await fetch('/api/scripts/health');
-  return parseJson(response);
+export async function fetchScriptHealth(): Promise<ScriptHealth> {
+  try {
+    const response = await fetch('/api/scripts/health');
+    if (!response.ok) {
+      return {
+        configured: false,
+        activeJob: null,
+        apiError: `Script API returned ${response.status}. Redeploy the latest admin panel code.`,
+      };
+    }
+    return parseJson<ScriptHealth>(response);
+  } catch {
+    return {
+      configured: false,
+      activeJob: null,
+      apiError:
+        'Could not reach /api/scripts/health. Check that the latest code is deployed on Vercel.',
+    };
+  }
 }
 
 export async function runScriptJob(

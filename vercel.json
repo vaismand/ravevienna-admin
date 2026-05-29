@@ -4,7 +4,11 @@
   "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }],
   "functions": {
     "api/scripts/run.ts": {
-      "maxDuration": 300
+      "maxDuration": 300,
+      "includeFiles": "scraper/**,scripts/**,server/**"
+    },
+    "api/scripts/health.ts": {
+      "maxDuration": 10
     }
   }
 }

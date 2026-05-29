@@ -21,6 +21,7 @@ import {
   type RaEnrichFormData,
 } from '../RaEnrichModal/RaEnrichModal';
 import { ScriptOutputPanel } from '../ScriptOutputPanel/ScriptOutputPanel';
+import { ScriptRunnerHint } from '../ScriptRunnerHint/ScriptRunnerHint';
 import styles from './DjsPage.module.css';
 
 const defaultFilters: DjFilters = { search: '', active: 'all' };
@@ -40,6 +41,8 @@ export function DjsPage() {
 
   const {
     configured: scriptApiConfigured,
+    missingEnv: scriptMissingEnv,
+    apiError: scriptApiError,
     running: scriptRunning,
     job: scriptJob,
     runScript,
@@ -192,14 +195,11 @@ export function DjsPage() {
         </div>
       </div>
 
-      {scriptApiConfigured === false && (
-        <p className={styles.scriptHint}>
-          Script runner unavailable. For local dev, use <code>.env.scripts</code>.
-          On Vercel, add <code>SUPABASE_URL</code>,{' '}
-          <code>SUPABASE_SERVICE_ROLE_KEY</code>, and Spotify keys in Project
-          Settings, then redeploy.
-        </p>
-      )}
+      <ScriptRunnerHint
+        configured={scriptApiConfigured}
+        missingEnv={scriptMissingEnv}
+        apiError={scriptApiError}
+      />
 
       {scriptJob && (
         <ScriptOutputPanel

@@ -29,6 +29,7 @@ import { DraftEventCard } from '../DraftEventCard/DraftEventCard';
 import { DraftEventEditor } from '../DraftEventEditor/DraftEventEditor';
 import { FiltersBar } from '../FiltersBar/FiltersBar';
 import { ScriptOutputPanel } from '../ScriptOutputPanel/ScriptOutputPanel';
+import { ScriptRunnerHint } from '../ScriptRunnerHint/ScriptRunnerHint';
 import styles from './DraftEventsPage.module.css';
 
 type ConfirmAction =
@@ -65,6 +66,8 @@ export function DraftEventsPage() {
     useReferenceData();
   const {
     configured: scriptApiConfigured,
+    missingEnv: scriptMissingEnv,
+    apiError: scriptApiError,
     running: scriptRunning,
     job: scriptJob,
     runScript,
@@ -354,14 +357,11 @@ export function DraftEventsPage() {
         </div>
       </div>
 
-      {scriptApiConfigured === false && (
-        <p className={styles.scriptHint}>
-          Script runner unavailable. For local dev, add{' '}
-          <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code>{' '}
-          to <code>.env.scripts</code> and restart <code>npm run dev</code>. On
-          Vercel, add the same server env vars in Project Settings and redeploy.
-        </p>
-      )}
+      <ScriptRunnerHint
+        configured={scriptApiConfigured}
+        missingEnv={scriptMissingEnv}
+        apiError={scriptApiError}
+      />
 
       {scriptJob && (
         <ScriptOutputPanel

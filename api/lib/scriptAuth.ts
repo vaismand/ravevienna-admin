@@ -1,46 +1,20 @@
 import { createClient } from "@supabase/supabase-js";
 
-import { loadScriptEnv } from "../scripts/lib/loadEnv.ts";
-
-loadScriptEnv();
-
-export type ScriptId = "scrape" | "enrich-spotify" | "enrich-ra";
-
-export type JobStatus = "running" | "completed" | "failed";
-
-export type ScriptJob = {
-  id: string;
-  scriptId: ScriptId;
-  status: JobStatus;
-  output: string;
-  exitCode: number | null;
-  startedAt: string;
-  finishedAt: string | null;
-};
-
-export function isScriptApiConfigured(): boolean {
-  const url =
-    process.env.SUPABASE_URL?.trim() ||
-    process.env.VITE_SUPABASE_URL?.trim();
-  return Boolean(url && process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
-}
-
-export function scriptApiConfigMessage(): string {
-  if (process.env.VERCEL) {
-    return "Script runner is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in Vercel → Project → Settings → Environment Variables, then redeploy.";
-  }
-
-  return "Script runner is not configured. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to .env.scripts and restart npm run dev.";
-}
+import {
+  getMissingScriptEnvVars,
+  getSupabaseUrl,
+  isScriptApiConfigured,
+} from "./scriptEnv.js";
 
 export async function verifyAdminToken(
   authorizationHeader: string | undefined
 ): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
   if (!isScriptApiConfigured()) {
+    const missing = getMissingScriptEnvVars().join(", ");
     return {
       ok: false,
       status: 503,
-      message: scriptApiConfigMessage(),
+      message: `Script runner is not configured. Missing: ${missing}. Add them in Vercel → Settings → Environment Variables, then redeploy.`,
     };
   }
 
@@ -51,8 +25,7 @@ export async function verifyAdminToken(
   }
 
   const supabase = createClient(
-    process.env.SUPABASE_URL?.trim() ||
-      process.env.VITE_SUPABASE_URL!.trim(),
+    getSupabaseUrl()!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { persistSession: false, autoRefreshToken: false } }
   );

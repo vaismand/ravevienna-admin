@@ -1,21 +1,19 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
+import {
+  getMissingScriptEnvVars,
+  isScriptApiConfigured,
+} from "../lib/scriptEnv.js";
 
-import { handleScriptHealth } from "../../server/apiHandlers.ts";
-
-export const config = {
-  maxDuration: 300,
+type ApiResponse = {
+  status: (code: number) => ApiResponse;
+  json: (body: unknown) => void;
 };
 
-export default async function handler(
-  req: IncomingMessage,
-  res: ServerResponse
-): Promise<void> {
-  if (req.method !== "GET") {
-    res.statusCode = 405;
-    res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ error: "Method not allowed." }));
-    return;
-  }
+export const maxDuration = 300;
 
-  await handleScriptHealth(req, res);
+export default function handler(_req: unknown, res: ApiResponse) {
+  res.status(200).json({
+    configured: isScriptApiConfigured(),
+    activeJob: null,
+    missingEnv: getMissingScriptEnvVars(),
+  });
 }
