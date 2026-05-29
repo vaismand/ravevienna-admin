@@ -164,8 +164,9 @@ export function DraftEventsPage() {
         merged.external_id,
         djIds,
       );
+      setEditingEvent(merged);
       notify('Draft event saved.', 'success');
-      await refreshAfterAction();
+      await reload();
     });
   };
 
