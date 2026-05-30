@@ -253,11 +253,16 @@ function mergeFlexEvent(
   };
 }
 
+function flexHomepageUrl(sourceUrl: string): string {
+  return new URL("/", sourceUrl).toString();
+}
+
 export async function scrapeFlex(source: ScrapeSource): Promise<ScrapedEvent[]> {
-  const { data: html } = await http.get(source.url);
+  const homepageUrl = flexHomepageUrl(source.url);
+  const { data: html } = await http.get(homepageUrl);
   const $ = cheerio.load(html);
 
-  const listings = parseFlexListingEvents($, source.url);
+  const listings = parseFlexListingEvents($, homepageUrl);
 
   console.log(`Found ${listings.length} Flex club event URLs`);
 
