@@ -4,7 +4,11 @@ import { loadScriptEnv } from "../scripts/lib/loadEnv.ts";
 
 loadScriptEnv();
 
-export type ScriptId = "scrape" | "enrich-spotify" | "enrich-ra";
+export type ScriptId =
+  | "scrape"
+  | "enrich-spotify"
+  | "enrich-ra"
+  | "enrich-soundcloud";
 
 export type JobStatus = "running" | "completed" | "failed";
 

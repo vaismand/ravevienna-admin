@@ -14,6 +14,10 @@ const scripts = [
     entry: "scripts/entries/enrich-ra.entry.ts",
     outfile: "dist/scripts/enrich-ra.cjs",
   },
+  {
+    entry: "scripts/entries/enrich-soundcloud.entry.ts",
+    outfile: "dist/scripts/enrich-soundcloud.cjs",
+  },
 ] as const;
 
 mkdirSync("dist/scripts", { recursive: true });

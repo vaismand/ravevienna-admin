@@ -10,6 +10,7 @@ const SCRIPT_IDS = new Set<ScriptId>([
   "scrape",
   "enrich-spotify",
   "enrich-ra",
+  "enrich-soundcloud",
 ]);
 
 export function sendJson(

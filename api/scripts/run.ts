@@ -22,7 +22,12 @@ type ApiResponse = {
 
 export const maxDuration = 300;
 
-const SCRIPT_IDS = new Set<ScriptId>(["scrape", "enrich-spotify", "enrich-ra"]);
+const SCRIPT_IDS = new Set<ScriptId>([
+  "scrape",
+  "enrich-spotify",
+  "enrich-ra",
+  "enrich-soundcloud",
+]);
 
 export default async function handler(
   req: ApiRequest,

@@ -1,6 +1,10 @@
 import { supabase } from './supabase';
 
-export type ScriptId = 'scrape' | 'enrich-spotify' | 'enrich-ra';
+export type ScriptId =
+  | 'scrape'
+  | 'enrich-spotify'
+  | 'enrich-ra'
+  | 'enrich-soundcloud';
 
 export type ScriptJobStatus = 'running' | 'completed' | 'failed';
 

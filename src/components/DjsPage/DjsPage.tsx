@@ -27,7 +27,7 @@ import styles from './DjsPage.module.css';
 
 const defaultFilters: DjFilters = { search: '', active: 'all' };
 
-type ConfirmAction = 'enrichSpotify' | null;
+type ConfirmAction = 'enrichSpotify' | 'enrichSoundcloud' | null;
 
 export function DjsPage() {
   const { djs, loading, error, reload } = useDjs();
@@ -131,6 +131,21 @@ export function DjsPage() {
     }
   };
 
+  const executeEnrichSoundcloud = async () => {
+    setConfirmAction(null);
+    try {
+      const finished = await runScript('enrich-soundcloud');
+      await handleScriptFinished('SoundCloud enrichment', finished);
+    } catch (err) {
+      notify(
+        err instanceof Error
+          ? err.message
+          : 'SoundCloud enrichment failed to start.',
+        'error',
+      );
+    }
+  };
+
   const handleRaEnrich = async (data: RaEnrichFormData) => {
     try {
       const finished = await runScript('enrich-ra', buildRaEnrichArgs(data));
@@ -149,7 +164,9 @@ export function DjsPage() {
       ? 'Spotify DJ enrichment'
       : scriptJob?.scriptId === 'enrich-ra'
         ? 'RA DJ enrichment'
-        : 'Admin script';
+        : scriptJob?.scriptId === 'enrich-soundcloud'
+          ? 'SoundCloud DJ enrichment'
+          : 'Admin script';
 
   return (
     <div className={styles.page}>
@@ -176,6 +193,15 @@ export function DjsPage() {
             running={scriptRunning && scriptJob?.scriptId === 'enrich-ra'}
             disabled={scriptApiConfigured === false || scriptRunning}
             onClick={() => setRaModalOpen(true)}
+          />
+          <ScriptRunButton
+            label="Enrich from SoundCloud"
+            runningLabel="SoundCloud running…"
+            running={
+              scriptRunning && scriptJob?.scriptId === 'enrich-soundcloud'
+            }
+            disabled={scriptApiConfigured === false || scriptRunning}
+            onClick={() => setConfirmAction('enrichSoundcloud')}
           />
           <button
             type="button"
@@ -259,6 +285,15 @@ export function DjsPage() {
         message="Match DJs against Spotify and update profiles where confidence is high enough. This writes to Supabase for matched DJs."
         confirmLabel="Run enrichment"
         onConfirm={() => void executeEnrichSpotify()}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmAction === 'enrichSoundcloud'}
+        title="Run SoundCloud enrichment?"
+        message="For DJs with a SoundCloud URL, fetch avatar, bio (up to 4 sentences), and social links when available. Only empty fields are filled unless you pass overwrite flags via CLI."
+        confirmLabel="Run enrichment"
+        onConfirm={() => void executeEnrichSoundcloud()}
         onCancel={() => setConfirmAction(null)}
       />
 

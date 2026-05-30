@@ -13,7 +13,8 @@
     "scrape:restore-drafts": "tsx scraper/scripts/restorePublishedDrafts.ts",
     "scrape:publish-approved": "tsx scraper/publishApproved.ts",
     "enrich:djs": "tsx scripts/entries/enrich-spotify.entry.ts",
-    "enrich:dj:ra": "tsx scripts/entries/enrich-ra.entry.ts"
+    "enrich:dj:ra": "tsx scripts/entries/enrich-ra.entry.ts",
+    "enrich:dj:soundcloud": "tsx scripts/entries/enrich-soundcloud.entry.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.0",

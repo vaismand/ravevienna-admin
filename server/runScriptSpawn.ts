@@ -4,7 +4,11 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 
-export type ScriptId = "scrape" | "enrich-spotify" | "enrich-ra";
+export type ScriptId =
+  | "scrape"
+  | "enrich-spotify"
+  | "enrich-ra"
+  | "enrich-soundcloud";
 
 export type ScriptJob = {
   id: string;
@@ -20,12 +24,14 @@ const BUNDLED_FILES: Record<ScriptId, string> = {
   scrape: "dist/scripts/scrape.cjs",
   "enrich-spotify": "dist/scripts/enrich-spotify.cjs",
   "enrich-ra": "dist/scripts/enrich-ra.cjs",
+  "enrich-soundcloud": "dist/scripts/enrich-soundcloud.cjs",
 };
 
 const SOURCE_FILES: Record<ScriptId, string> = {
   scrape: "scraper/scripts/scrape.ts",
   "enrich-spotify": "scripts/enrich-djs-spotify.ts",
   "enrich-ra": "scripts/enrich-dj-ra.ts",
+  "enrich-soundcloud": "scripts/enrich-dj-soundcloud.ts",
 };
 
 const require = createRequire(import.meta.url);
