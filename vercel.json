@@ -5,7 +5,7 @@
   "functions": {
     "api/scripts/run.ts": {
       "maxDuration": 300,
-      "includeFiles": "scraper/**,scripts/**,node_modules/tsx/**,node_modules/esbuild/**"
+      "includeFiles": "dist/scripts/**"
     },
     "api/scripts/health.ts": {
       "maxDuration": 10

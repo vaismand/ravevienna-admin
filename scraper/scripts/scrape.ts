@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { fileURLToPath } from "node:url";
 
 import { loadScriptEnv } from "../../scripts/lib/loadEnv.ts";
 import { normalizeEventGenres } from "../../scripts/lib/genres.ts";
@@ -248,15 +247,4 @@ async function main() {
 
 export async function runScrape(): Promise<void> {
   await main();
-}
-
-const isDirectRun =
-  typeof process.argv[1] === "string" &&
-  fileURLToPath(import.meta.url) === fileURLToPath(process.argv[1]);
-
-if (isDirectRun) {
-  runScrape().catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
 }

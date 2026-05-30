@@ -20,6 +20,7 @@ const NON_ARTIST_LABELS = new Set([
   "w/",
   "tba",
   "tbc",
+  "t.b.a",
   "more tba",
 ]);
 

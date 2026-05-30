@@ -1,5 +1,8 @@
 import { verifyAdminToken } from "../lib/scriptAuth.js";
-import { runScriptSpawn, type ScriptId } from "../lib/runScriptSpawn.js";
+import {
+  runScriptSpawn,
+  type ScriptId,
+} from "../../server/runScriptSpawn.js";
 
 type ApiRequest = {
   method?: string;

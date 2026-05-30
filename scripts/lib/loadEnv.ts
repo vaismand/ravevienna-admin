@@ -1,4 +1,4 @@
-import { config as loadEnv } from "dotenv";
+import { config as loadEnvFile } from "dotenv";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 
@@ -11,10 +11,12 @@ const ENV_FILES = [
 
 /** Load server-side env for CLI scripts (service role, Spotify, etc.). */
 export function loadScriptEnv(cwd = process.cwd()): void {
-  for (const name of ENV_FILES) {
-    const path = join(cwd, name);
-    if (existsSync(path)) {
-      loadEnv({ path, override: true });
+  if (!process.env.VERCEL) {
+    for (const name of ENV_FILES) {
+      const path = join(cwd, name);
+      if (existsSync(path)) {
+        loadEnvFile({ path, override: true });
+      }
     }
   }
 

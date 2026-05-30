@@ -13,7 +13,6 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { fileURLToPath } from "node:url";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -27,10 +26,9 @@ import { normalizeSpotifyGenres } from "./lib/normalizeSpotifyGenres.ts";
 
 loadScriptEnv();
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
 const REVIEW_CSV_PATH = process.env.VERCEL
   ? join(tmpdir(), "dj-enrichment-review.csv")
-  : join(__dirname, "output", "dj-enrichment-review.csv");
+  : join(process.cwd(), "scripts/output", "dj-enrichment-review.csv");
 
 const MIGRATION_SQL = `-- Optional Spotify enrichment columns for public.djs
 alter table public.djs
@@ -633,15 +631,4 @@ export async function runEnrichDjsSpotify(
   argv: string[] = process.argv.slice(2)
 ): Promise<void> {
   await main(argv);
-}
-
-const isDirectRun =
-  typeof process.argv[1] === "string" &&
-  fileURLToPath(import.meta.url) === fileURLToPath(process.argv[1]);
-
-if (isDirectRun) {
-  runEnrichDjsSpotify().catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exit(1);
-  });
 }

@@ -20,5 +20,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "server/middleware.ts", "server/apiHandlers.ts", "server/scriptJobs.ts", "server/spawnScript.ts", "api/lib/**/*.ts", "api/scripts/health.ts"]
+  "include": ["vite.config.ts", "server/middleware.ts", "server/apiHandlers.ts", "server/scriptJobs.ts", "server/spawnScript.ts", "server/runScriptSpawn.ts", "api/lib/**/*.ts", "api/scripts/health.ts"]
 }

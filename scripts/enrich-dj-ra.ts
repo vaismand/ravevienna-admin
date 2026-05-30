@@ -12,7 +12,6 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { loadScriptEnv } from "./lib/loadEnv.ts";
@@ -621,15 +620,4 @@ export async function runEnrichDjRa(
   argv: string[] = process.argv.slice(2)
 ): Promise<void> {
   await main(argv);
-}
-
-const isDirectRun =
-  typeof process.argv[1] === "string" &&
-  fileURLToPath(import.meta.url) === fileURLToPath(process.argv[1]);
-
-if (isDirectRun) {
-  runEnrichDjRa().catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exit(1);
-  });
 }
