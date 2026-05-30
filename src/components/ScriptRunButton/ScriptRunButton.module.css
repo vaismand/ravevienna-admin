@@ -1,0 +1,31 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid rgba(138, 154, 154, 0.35);
+  background: rgba(3, 10, 10, 0.6);
+  color: #c8d6d6;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: rgba(0, 240, 208, 0.35);
+  color: #fff;
+}
+
+.btn:disabled:not(.running) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.running {
+  border-color: rgba(0, 240, 208, 0.45);
+  background: rgba(0, 240, 208, 0.1);
+  color: #00f0d0;
+  cursor: wait;
+}

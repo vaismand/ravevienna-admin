@@ -1,4 +1,5 @@
 import styles from './ConfirmDialog.module.css';
+import { LoadingSpinner } from '../LoadingSpinner/LoadingSpinner';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -7,6 +8,7 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: 'default' | 'danger';
+  busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -18,6 +20,7 @@ export function ConfirmDialog({
   confirmLabel = 'Confirm',
   cancelLabel = 'Cancel',
   variant = 'default',
+  busy = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -29,7 +32,7 @@ export function ConfirmDialog({
         <h3 className={styles.title}>{title}</h3>
         <p className={styles.message}>{message}</p>
         <div className={styles.actions}>
-          <button type="button" className={styles.cancelBtn} onClick={onCancel}>
+          <button type="button" className={styles.cancelBtn} onClick={onCancel} disabled={busy}>
             {cancelLabel}
           </button>
           <button
@@ -38,8 +41,10 @@ export function ConfirmDialog({
               variant === 'danger' ? styles.dangerBtn : styles.confirmBtn
             }
             onClick={onConfirm}
+            disabled={busy}
           >
-            {confirmLabel}
+            {busy && <LoadingSpinner className={styles.btnSpinner} />}
+            {busy ? 'Running…' : confirmLabel}
           </button>
         </div>
       </div>

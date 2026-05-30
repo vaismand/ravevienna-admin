@@ -29,6 +29,7 @@ import { DraftEventCard } from '../DraftEventCard/DraftEventCard';
 import { DraftEventEditor } from '../DraftEventEditor/DraftEventEditor';
 import { FiltersBar } from '../FiltersBar/FiltersBar';
 import { ScriptOutputPanel } from '../ScriptOutputPanel/ScriptOutputPanel';
+import { ScriptRunButton } from '../ScriptRunButton/ScriptRunButton';
 import { ScriptRunnerHint } from '../ScriptRunnerHint/ScriptRunnerHint';
 import styles from './DraftEventsPage.module.css';
 
@@ -255,9 +256,9 @@ export function DraftEventsPage() {
   };
 
   const executeRunScraper = async () => {
-    setConfirmAction(null);
     try {
       const finished = await runScript('scrape');
+      setConfirmAction(null);
       if (finished.status === 'completed') {
         notify('Scraper finished. Refreshing draft events…', 'success');
         await reload();
@@ -265,6 +266,7 @@ export function DraftEventsPage() {
         notify('Scraper finished with errors. See output below.', 'error');
       }
     } catch (err) {
+      setConfirmAction(null);
       notify(
         err instanceof Error ? err.message : 'Scraper failed to start.',
         'error',
@@ -304,7 +306,7 @@ export function DraftEventsPage() {
     runScraper: {
       title: 'Run venue scraper?',
       message:
-        'Fetch events from active venue websites and upsert pending draft_events. Approved, published, and rejected drafts are left unchanged.',
+        'Fetch events from active venue websites and upsert pending draft_events. Approved, published, and rejected drafts are left unchanged. This usually takes 1–3 minutes — keep this tab open until it finishes.',
       confirmLabel: 'Run scraper',
       variant: 'default' as const,
       onConfirm: () => void executeRunScraper(),
@@ -334,19 +336,18 @@ export function DraftEventsPage() {
         ))}
         </div>
         <div className={styles.tabsActions}>
-          <button
-            type="button"
-            className={styles.scriptBtn}
-            disabled={scriptRunning || scriptApiConfigured === false}
+          <ScriptRunButton
+            label="Run scraper"
+            runningLabel="Scraper running…"
+            running={scriptRunning && scriptJob?.scriptId === 'scrape'}
+            disabled={scriptApiConfigured === false}
             title={
               scriptApiConfigured === false
-                ? 'Configure .env.scripts and restart npm run dev'
+                ? 'Configure script runner env vars and redeploy'
                 : undefined
             }
             onClick={() => setConfirmAction('runScraper')}
-          >
-            {scriptRunning ? 'Scraper running…' : 'Run scraper'}
-          </button>
+          />
           <button
             type="button"
             className={styles.addEventBtn}
@@ -363,11 +364,11 @@ export function DraftEventsPage() {
         apiError={scriptApiError}
       />
 
-      {scriptJob && (
+      {(scriptJob || scriptRunning) && (
         <ScriptOutputPanel
           title="Venue scraper"
-          output={scriptJob.output}
-          status={scriptJob.status}
+          output={scriptJob?.output ?? 'Starting script…'}
+          status={scriptJob?.status ?? (scriptRunning ? 'running' : null)}
           onClose={clearJob}
         />
       )}
@@ -524,6 +525,7 @@ export function DraftEventsPage() {
           message={activeConfirm.message}
           confirmLabel={activeConfirm.confirmLabel}
           variant={activeConfirm.variant}
+          busy={confirmAction === 'runScraper' && scriptRunning}
           onConfirm={activeConfirm.onConfirm}
           onCancel={() => setConfirmAction(null)}
         />

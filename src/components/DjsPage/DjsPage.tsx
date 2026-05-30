@@ -21,6 +21,7 @@ import {
   type RaEnrichFormData,
 } from '../RaEnrichModal/RaEnrichModal';
 import { ScriptOutputPanel } from '../ScriptOutputPanel/ScriptOutputPanel';
+import { ScriptRunButton } from '../ScriptRunButton/ScriptRunButton';
 import { ScriptRunnerHint } from '../ScriptRunnerHint/ScriptRunnerHint';
 import styles from './DjsPage.module.css';
 
@@ -160,31 +161,22 @@ export function DjsPage() {
       <div className={styles.toolbar}>
         <DjFiltersBar filters={filters} onChange={setFilters} />
         <div className={styles.toolbarActions}>
-          <button
-            type="button"
-            className={styles.scriptBtn}
-            disabled={scriptRunning || scriptApiConfigured === false}
-            title={
-              scriptApiConfigured === false
-                ? 'Configure .env.scripts and restart npm run dev'
-                : undefined
+          <ScriptRunButton
+            label="Enrich from Spotify"
+            runningLabel="Spotify running…"
+            running={
+              scriptRunning && scriptJob?.scriptId === 'enrich-spotify'
             }
+            disabled={scriptApiConfigured === false}
             onClick={() => setConfirmAction('enrichSpotify')}
-          >
-            {scriptRunning && scriptJob?.scriptId === 'enrich-spotify'
-              ? 'Spotify running…'
-              : 'Enrich from Spotify'}
-          </button>
-          <button
-            type="button"
-            className={styles.scriptBtn}
-            disabled={scriptRunning || scriptApiConfigured === false}
+          />
+          <ScriptRunButton
+            label="Enrich from RA"
+            runningLabel="RA running…"
+            running={scriptRunning && scriptJob?.scriptId === 'enrich-ra'}
+            disabled={scriptApiConfigured === false || scriptRunning}
             onClick={() => setRaModalOpen(true)}
-          >
-            {scriptRunning && scriptJob?.scriptId === 'enrich-ra'
-              ? 'RA running…'
-              : 'Enrich from RA'}
-          </button>
+          />
           <button
             type="button"
             className={styles.addBtn}
@@ -201,11 +193,11 @@ export function DjsPage() {
         apiError={scriptApiError}
       />
 
-      {scriptJob && (
+      {(scriptJob || scriptRunning) && (
         <ScriptOutputPanel
           title={scriptPanelTitle}
-          output={scriptJob.output}
-          status={scriptJob.status}
+          output={scriptJob?.output ?? 'Starting script…'}
+          status={scriptJob?.status ?? (scriptRunning ? 'running' : null)}
           onClose={clearJob}
         />
       )}

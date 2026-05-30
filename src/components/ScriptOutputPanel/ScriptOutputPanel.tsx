@@ -18,7 +18,10 @@ export function ScriptOutputPanel({
   }
 
   return (
-    <section className={styles.panel} aria-live="polite">
+    <section
+      className={`${styles.panel} ${status === 'running' ? styles.panelRunning : ''}`}
+      aria-live="polite"
+    >
       <div className={styles.header}>
         <div className={styles.titleRow}>
           <h3 className={styles.title}>{title}</h3>

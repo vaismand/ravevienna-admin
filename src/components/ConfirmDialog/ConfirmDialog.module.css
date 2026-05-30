@@ -39,10 +39,20 @@
 .cancelBtn,
 .confirmBtn,
 .dangerBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   padding: 0.5rem 0.9rem;
   border-radius: 8px;
   cursor: pointer;
   font-size: 0.85rem;
+}
+
+.cancelBtn:disabled,
+.confirmBtn:disabled,
+.dangerBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .cancelBtn {
