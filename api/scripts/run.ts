@@ -1,4 +1,5 @@
 import { verifyAdminToken } from "../lib/scriptAuth.js";
+import { runScriptSpawn, type ScriptId } from "../lib/runScriptSpawn.js";
 
 type ApiRequest = {
   method?: string;
@@ -13,7 +14,7 @@ type ApiResponse = {
 
 export const maxDuration = 300;
 
-const SCRIPT_IDS = new Set(["scrape", "enrich-spotify", "enrich-ra"]);
+const SCRIPT_IDS = new Set<ScriptId>(["scrape", "enrich-spotify", "enrich-ra"]);
 
 export default async function handler(
   req: ApiRequest,
@@ -37,7 +38,7 @@ export default async function handler(
   const body = (req.body ?? {}) as { scriptId?: unknown; args?: unknown };
   const scriptId = body.scriptId;
 
-  if (typeof scriptId !== "string" || !SCRIPT_IDS.has(scriptId)) {
+  if (typeof scriptId !== "string" || !SCRIPT_IDS.has(scriptId as ScriptId)) {
     res.status(400).json({ error: "Invalid scriptId." });
     return;
   }
@@ -57,11 +58,7 @@ export default async function handler(
   }
 
   try {
-    const { runScriptDirect } = await import("../../server/runScriptDirect.js");
-    const job = await runScriptDirect(
-      scriptId as "scrape" | "enrich-spotify" | "enrich-ra",
-      args ?? []
-    );
+    const job = await runScriptSpawn(scriptId as ScriptId, args ?? []);
     res.status(200).json({ job });
   } catch (error) {
     res.status(500).json({
