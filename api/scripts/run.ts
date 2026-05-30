@@ -1,3 +1,8 @@
+// Ensure bundled script runtime deps are present in the serverless bundle.
+import "@supabase/supabase-js";
+import "axios";
+import "cheerio";
+
 import { verifyAdminToken } from "../lib/scriptAuth.js";
 import {
   runScriptSpawn,
