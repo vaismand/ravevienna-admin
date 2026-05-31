@@ -5,12 +5,21 @@ import styles from './DjCard.module.css';
 
 interface DjCardProps {
   dj: Dj;
+  selected: boolean;
+  onSelect: (id: string, checked: boolean) => void;
   onEdit: (dj: Dj) => void;
   onToggleActive: (dj: Dj) => void;
   onDelete: (dj: Dj) => void;
 }
 
-export function DjCard({ dj, onEdit, onToggleActive, onDelete }: DjCardProps) {
+export function DjCard({
+  dj,
+  selected,
+  onSelect,
+  onEdit,
+  onToggleActive,
+  onDelete,
+}: DjCardProps) {
   const genres = dj.genres ?? [];
   const links = [
     dj.instagram_url && 'IG',
@@ -20,7 +29,22 @@ export function DjCard({ dj, onEdit, onToggleActive, onDelete }: DjCardProps) {
   ].filter(Boolean);
 
   return (
-    <article className={styles.card}>
+    <article className={`${styles.card} ${selected ? styles.selected : ''}`}>
+      <div className={styles.selectRow}>
+        <input
+          type="checkbox"
+          className={styles.checkbox}
+          checked={selected}
+          onChange={(e) => onSelect(dj.id, e.target.checked)}
+          aria-label={`Select ${dj.name}`}
+        />
+        <span
+          className={`${styles.status} ${dj.is_active ? styles.active : styles.inactive}`}
+        >
+          {dj.is_active ? 'Active' : 'Inactive'}
+        </span>
+      </div>
+
       <div className={styles.topRow}>
         <div className={styles.avatarWrap}>
           {dj.image_url ? (
@@ -41,11 +65,6 @@ export function DjCard({ dj, onEdit, onToggleActive, onDelete }: DjCardProps) {
           <h3 className={styles.name}>{dj.name}</h3>
           <p className={styles.slug}>/{dj.slug}</p>
         </div>
-        <span
-          className={`${styles.status} ${dj.is_active ? styles.active : styles.inactive}`}
-        >
-          {dj.is_active ? 'Active' : 'Inactive'}
-        </span>
       </div>
 
       <div className={styles.meta}>

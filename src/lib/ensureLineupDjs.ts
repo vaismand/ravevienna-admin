@@ -3,6 +3,7 @@ import { slugFromName } from './djUtils';
 import { formatPostgrestError } from './supabaseErrors';
 import {
   escapeIlikePattern,
+  genresForNewLineupDj,
   lineupNamesMatch,
   normalizeLineupArtistName,
   prepareLineupForDjImport,
@@ -12,6 +13,16 @@ export interface EnsureLineupDjsResult {
   created: string[];
   existing: string[];
 }
+
+export type LineupDjSource = {
+  lineup: string[] | null | undefined;
+  eventGenres?: string[] | null;
+};
+
+export type LineupDjContext = {
+  lineup?: string[];
+  eventGenres?: string[] | null;
+};
 
 function isUniqueViolation(error: { code?: string }): boolean {
   return error.code === '23505';
@@ -103,65 +114,76 @@ async function ensureUniqueSlug(baseSlug: string): Promise<string> {
  * Ensure every lineup artist exists in `djs`. Missing names are inserted as
  * inactive drafts (`is_active: false`) so they can be edited before publishing.
  */
-export async function ensureDjsFromLineup(
-  lineup: string[] | null | undefined,
+export async function ensureDjsFromLineupSources(
+  sources: LineupDjSource[],
 ): Promise<EnsureLineupDjsResult> {
-  const names = prepareLineupForDjImport(lineup ?? []);
   const created: string[] = [];
   const existing: string[] = [];
   const resolvedNames = new Set<string>();
 
-  for (const name of names) {
-    const dedupeKey = name.toLowerCase();
-    if (resolvedNames.has(dedupeKey)) {
-      existing.push(name);
-      continue;
-    }
+  for (const source of sources) {
+    const names = prepareLineupForDjImport(source.lineup ?? []);
+    const genres = genresForNewLineupDj(source.eventGenres);
 
-    const existingId = await findDjByNameOrSlug(name);
-    if (existingId) {
-      existing.push(name);
-      resolvedNames.add(dedupeKey);
-      continue;
-    }
+    for (const name of names) {
+      const dedupeKey = name.toLowerCase();
+      if (resolvedNames.has(dedupeKey)) {
+        existing.push(name);
+        continue;
+      }
 
-    const baseSlug = slugFromName(name);
-    if (!baseSlug) continue;
-
-    const slug = await ensureUniqueSlug(baseSlug);
-    const now = new Date().toISOString();
-
-    const { error } = await supabase.from('djs').insert({
-      name,
-      slug,
-      bio: null,
-      genres: [],
-      instagram_url: null,
-      soundcloud_url: null,
-      spotify_url: null,
-      website_url: null,
-      image_url: null,
-      city: 'Vienna',
-      country: 'Austria',
-      is_active: false,
-      created_at: now,
-      updated_at: now,
-    });
-
-    if (error) {
-      if (isUniqueViolation(error)) {
+      const existingId = await findDjByNameOrSlug(name);
+      if (existingId) {
         existing.push(name);
         resolvedNames.add(dedupeKey);
         continue;
       }
-      throw new Error(formatPostgrestError(error));
-    }
 
-    created.push(name);
-    resolvedNames.add(dedupeKey);
+      const baseSlug = slugFromName(name);
+      if (!baseSlug) continue;
+
+      const slug = await ensureUniqueSlug(baseSlug);
+      const now = new Date().toISOString();
+
+      const { error } = await supabase.from('djs').insert({
+        name,
+        slug,
+        bio: null,
+        genres,
+        instagram_url: null,
+        soundcloud_url: null,
+        spotify_url: null,
+        website_url: null,
+        image_url: null,
+        city: 'Vienna',
+        country: 'Austria',
+        is_active: false,
+        created_at: now,
+        updated_at: now,
+      });
+
+      if (error) {
+        if (isUniqueViolation(error)) {
+          existing.push(name);
+          resolvedNames.add(dedupeKey);
+          continue;
+        }
+        throw new Error(formatPostgrestError(error));
+      }
+
+      created.push(name);
+      resolvedNames.add(dedupeKey);
+    }
   }
 
   return { created, existing };
+}
+
+export async function ensureDjsFromLineup(
+  lineup: string[] | null | undefined,
+  eventGenres?: string[] | null,
+): Promise<EnsureLineupDjsResult> {
+  return ensureDjsFromLineupSources([{ lineup, eventGenres }]);
 }
 
 export async function ensureDjsFromDraftLineups(
@@ -171,17 +193,15 @@ export async function ensureDjsFromDraftLineups(
 
   const { data, error } = await supabase
     .from('draft_events')
-    .select('lineup')
+    .select('lineup, genres')
     .in('id', draftIds);
 
   if (error) throw new Error(formatPostgrestError(error));
 
-  const allNames: string[] = [];
-  for (const row of data ?? []) {
-    if (Array.isArray(row.lineup)) {
-      allNames.push(...row.lineup);
-    }
-  }
-
-  return ensureDjsFromLineup(allNames);
+  return ensureDjsFromLineupSources(
+    (data ?? []).map((row) => ({
+      lineup: Array.isArray(row.lineup) ? row.lineup : [],
+      eventGenres: Array.isArray(row.genres) ? row.genres : null,
+    })),
+  );
 }

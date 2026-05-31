@@ -96,9 +96,20 @@ export function prepareLineupForDjImport(lineup: string[]): string[] {
   return names;
 }
 
-/** @deprecated Use prepareLineupForDjImport */
+/** Lineup names that should become DJ records (excludes floors/stages). */
 export function filterLineupForDjImport(lineup: string[]): string[] {
   return prepareLineupForDjImport(lineup);
+}
+
+/**
+ * When auto-creating a DJ from an event lineup, copy the event genre only if
+ * the event has exactly one genre; otherwise leave the DJ's genres empty.
+ */
+export function genresForNewLineupDj(
+  eventGenres: string[] | null | undefined,
+): string[] {
+  const genres = (eventGenres ?? []).map((g) => g.trim()).filter(Boolean);
+  return genres.length === 1 ? [genres[0]!] : [];
 }
 
 export function lineupNamesMatch(a: string, b: string): boolean {

@@ -2,7 +2,9 @@ import { supabase } from './supabase';
 import {
   ensureDjsFromDraftLineups,
   ensureDjsFromLineup,
+  ensureDjsFromLineupSources,
   type EnsureLineupDjsResult,
+  type LineupDjContext,
 } from './ensureLineupDjs';
 import { parseLineupText } from './lineup';
 import { formatPostgrestError } from './supabaseErrors';
@@ -100,7 +102,7 @@ export async function createDraftEvent(
 
   let djs: EnsureLineupDjsResult | null = null;
   if (initialStatus === 'approved') {
-    djs = await ensureDjsFromLineup(parseLineupText(data.lineup));
+    djs = await ensureDjsFromLineup(parseLineupText(data.lineup), data.genres);
   }
 
   return { event: row as DraftEvent, djs };
@@ -121,7 +123,7 @@ export async function saveDraftEvent(
 export async function updateDraftStatus(
   id: string,
   status: ReviewStatus,
-  lineup?: string[],
+  lineupContext?: LineupDjContext,
 ): Promise<EnsureLineupDjsResult | null> {
   const { error } = await supabase
     .from('draft_events')
@@ -132,8 +134,8 @@ export async function updateDraftStatus(
 
   if (status !== 'approved') return null;
 
-  if (lineup) {
-    return ensureDjsFromLineup(lineup);
+  if (lineupContext?.lineup) {
+    return ensureDjsFromLineup(lineupContext.lineup, lineupContext.eventGenres);
   }
 
   return ensureDjsFromDraftLineups([id]);
@@ -193,7 +195,7 @@ export async function publishDraftEvent(
 
   const djs = options?.skipLineupDjs
     ? null
-    : await ensureDjsFromLineup(draft.lineup ?? []);
+    : await ensureDjsFromLineup(draft.lineup ?? [], draft.genres);
 
   const { error: statusError } = await supabase
     .from('draft_events')
@@ -237,10 +239,12 @@ export async function bulkPublish(
   const failed: string[] = [];
   let succeeded = 0;
 
-  const allLineupNames = drafts.flatMap((draft) =>
-    Array.isArray(draft.lineup) ? draft.lineup : [],
+  const djs = await ensureDjsFromLineupSources(
+    drafts.map((draft) => ({
+      lineup: draft.lineup ?? [],
+      eventGenres: draft.genres,
+    })),
   );
-  const djs = await ensureDjsFromLineup(allLineupNames);
 
   for (const draft of drafts) {
     try {

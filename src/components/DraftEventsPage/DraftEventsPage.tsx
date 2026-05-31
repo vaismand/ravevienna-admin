@@ -196,11 +196,10 @@ export function DraftEventsPage() {
       let djs = null;
       if (status === 'approved' && formData) {
         await saveDraftEvent(editingEvent.id, formData);
-        djs = await updateDraftStatus(
-          editingEvent.id,
-          status,
-          parseLineupText(formData.lineup),
-        );
+        djs = await updateDraftStatus(editingEvent.id, status, {
+          lineup: parseLineupText(formData.lineup),
+          eventGenres: formData.genres,
+        });
       } else {
         djs = await updateDraftStatus(editingEvent.id, status);
       }

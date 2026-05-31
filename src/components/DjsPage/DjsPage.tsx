@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
+  bulkActivateDjs,
+  bulkDeleteDjs,
   createDj,
   deleteDj,
   toggleDjActive,
@@ -31,6 +33,8 @@ type ConfirmAction =
   | 'enrichSpotify'
   | 'enrichSoundcloud'
   | 'enrichSoundcloudInactive'
+  | 'bulkActivate'
+  | 'bulkDelete'
   | null;
 
 export function DjsPage() {
@@ -42,6 +46,7 @@ export function DjsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Dj | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [raModalOpen, setRaModalOpen] = useState(false);
 
   const {
@@ -62,6 +67,26 @@ export function DjsPage() {
       return true;
     });
   }, [djs, filters]);
+
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    setSelectedIds(new Set(filteredDjs.map((dj) => dj.id)));
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const refreshAfterBulkAction = async () => {
+    await reload();
+    setSelectedIds(new Set());
+  };
 
   const runWithBusy = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -108,6 +133,26 @@ export function DjsPage() {
       setDeleteTarget(null);
       await reload();
     });
+  };
+
+  const executeBulkActivate = async () => {
+    const ids = [...selectedIds];
+    await runWithBusy(async () => {
+      await bulkActivateDjs(ids);
+      notify(`Activated ${ids.length} DJ(s).`, 'success');
+      await refreshAfterBulkAction();
+    });
+    setConfirmAction(null);
+  };
+
+  const executeBulkDelete = async () => {
+    const ids = [...selectedIds];
+    await runWithBusy(async () => {
+      await bulkDeleteDjs(ids);
+      notify(`Deleted ${ids.length} DJ(s).`, 'success');
+      await refreshAfterBulkAction();
+    });
+    setConfirmAction(null);
   };
 
   const handleScriptFinished = async (
@@ -230,6 +275,54 @@ export function DjsPage() {
         </div>
       </div>
 
+      {!loading && !error && filteredDjs.length > 0 && (
+        <div className={styles.bulkToolbar}>
+          <div className={styles.selectionInfo}>
+            {selectedIds.size > 0 ? (
+              <span>{selectedIds.size} selected</span>
+            ) : (
+              <span>{filteredDjs.length} DJs</span>
+            )}
+            <button
+              type="button"
+              className={styles.linkBtn}
+              onClick={selectAllVisible}
+              disabled={filteredDjs.length === 0}
+            >
+              Select all
+            </button>
+            {selectedIds.size > 0 && (
+              <button
+                type="button"
+                className={styles.linkBtn}
+                onClick={clearSelection}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+
+          <div className={styles.bulkActions}>
+            <button
+              type="button"
+              className={styles.bulkBtn}
+              disabled={selectedIds.size === 0 || busy}
+              onClick={() => setConfirmAction('bulkActivate')}
+            >
+              Activate selected
+            </button>
+            <button
+              type="button"
+              className={`${styles.bulkBtn} ${styles.danger}`}
+              disabled={selectedIds.size === 0 || busy}
+              onClick={() => setConfirmAction('bulkDelete')}
+            >
+              Delete selected
+            </button>
+          </div>
+        </div>
+      )}
+
       <ScriptRunnerHint
         configured={scriptApiConfigured}
         missingEnv={scriptMissingEnv}
@@ -261,6 +354,8 @@ export function DjsPage() {
           <DjCard
             key={dj.id}
             dj={dj}
+            selected={selectedIds.has(dj.id)}
+            onSelect={toggleSelect}
             onEdit={setEditingDj}
             onToggleActive={handleToggleActive}
             onDelete={setDeleteTarget}
@@ -320,6 +415,25 @@ export function DjsPage() {
         message="Same as SoundCloud enrichment, but only for inactive DJs that already have a SoundCloud URL. Useful for draft lineup DJs before you activate them."
         confirmLabel="Run for inactive"
         onConfirm={() => void executeEnrichSoundcloud(true)}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmAction === 'bulkActivate'}
+        title="Activate selected DJs?"
+        message={`Set ${selectedIds.size} DJ(s) as active? They will appear in the mobile app lineup picker.`}
+        confirmLabel="Activate all"
+        onConfirm={() => void executeBulkActivate()}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmAction === 'bulkDelete'}
+        title="Delete selected DJs?"
+        message={`Permanently delete ${selectedIds.size} DJ(s)? This removes event links but does not delete events.`}
+        confirmLabel="Delete all"
+        variant="danger"
+        onConfirm={() => void executeBulkDelete()}
         onCancel={() => setConfirmAction(null)}
       />
 

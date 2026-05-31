@@ -67,6 +67,24 @@ export async function toggleDjActive(
   if (error) throw new Error(formatPostgrestError(error));
 }
 
+export async function bulkActivateDjs(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+
+  const { error } = await supabase
+    .from('djs')
+    .update({ is_active: true, updated_at: new Date().toISOString() })
+    .in('id', ids);
+
+  if (error) throw new Error(formatPostgrestError(error));
+}
+
+export async function bulkDeleteDjs(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+
+  const { error } = await supabase.from('djs').delete().in('id', ids);
+  if (error) throw new Error(formatPostgrestError(error));
+}
+
 export async function fetchEventsForDj(
   djId: string,
 ): Promise<{ event_id: string; position: number }[]> {
