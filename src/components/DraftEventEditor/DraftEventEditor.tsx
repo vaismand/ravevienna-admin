@@ -35,7 +35,7 @@ interface DraftEventEditorProps {
   busy: boolean;
   onClose: () => void;
   onSave: (data: DraftEventFormData, djIds: string[]) => Promise<void>;
-  onApprove: () => Promise<void>;
+  onApprove: (data: DraftEventFormData) => Promise<void>;
   onReject: () => Promise<void>;
   onPending: () => Promise<void>;
   onPublish: (data: DraftEventFormData, djIds: string[]) => Promise<void>;
@@ -122,7 +122,7 @@ export function DraftEventEditor({
             <button
               type="button"
               className={styles.approveBtn}
-              onClick={() => void onApprove()}
+              onClick={() => void onApprove(form)}
               disabled={busy}
             >
               Approve

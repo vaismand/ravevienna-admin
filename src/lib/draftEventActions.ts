@@ -1,4 +1,10 @@
 import { supabase } from './supabase';
+import {
+  ensureDjsFromDraftLineups,
+  ensureDjsFromLineup,
+  type EnsureLineupDjsResult,
+} from './ensureLineupDjs';
+import { mergeLineupDjResults } from './draftApproveMessages';
 import { parseLineupText } from './lineup';
 import { formatPostgrestError } from './supabaseErrors';
 import type {
@@ -75,7 +81,7 @@ export async function createDraftEvent(
   data: DraftEventFormData,
   sourceId: string,
   initialStatus: ReviewStatus = 'pending',
-): Promise<DraftEvent> {
+): Promise<{ event: DraftEvent; djs: EnsureLineupDjsResult | null }> {
   const externalId = `manual-${crypto.randomUUID()}`;
 
   const { data: row, error } = await supabase
@@ -92,7 +98,13 @@ export async function createDraftEvent(
     .single();
 
   if (error) throw new Error(formatPostgrestError(error));
-  return row as DraftEvent;
+
+  let djs: EnsureLineupDjsResult | null = null;
+  if (initialStatus === 'approved') {
+    djs = await ensureDjsFromLineup(parseLineupText(data.lineup));
+  }
+
+  return { event: row as DraftEvent, djs };
 }
 
 export async function saveDraftEvent(
@@ -110,20 +122,31 @@ export async function saveDraftEvent(
 export async function updateDraftStatus(
   id: string,
   status: ReviewStatus,
-): Promise<void> {
+  lineup?: string[],
+): Promise<EnsureLineupDjsResult | null> {
   const { error } = await supabase
     .from('draft_events')
     .update({ status, updated_at: new Date().toISOString() })
     .eq('id', id);
 
   if (error) throw new Error(formatPostgrestError(error));
+
+  if (status !== 'approved') return null;
+
+  if (lineup) {
+    return ensureDjsFromLineup(lineup);
+  }
+
+  return ensureDjsFromDraftLineups([id]);
 }
 
 /**
  * Publish draft → events using select-then-insert/update (works without upsert constraint).
  * Matches draft_events columns only (no draft_event_id — add column + field if needed).
  */
-export async function publishDraftEvent(draft: DraftEvent): Promise<string> {
+export async function publishDraftEvent(
+  draft: DraftEvent,
+): Promise<{ eventId: string; djs: EnsureLineupDjsResult }> {
   if (!draft.source_id || !draft.external_id) {
     throw new Error(
       'Cannot publish: source_id and external_id are required.',
@@ -168,6 +191,8 @@ export async function publishDraftEvent(draft: DraftEvent): Promise<string> {
     eventId = inserted.id as string;
   }
 
+  const djs = await ensureDjsFromLineup(draft.lineup ?? []);
+
   const { error: statusError } = await supabase
     .from('draft_events')
     .update({ status: 'published', updated_at: new Date().toISOString() })
@@ -177,19 +202,22 @@ export async function publishDraftEvent(draft: DraftEvent): Promise<string> {
     throw new Error(formatPostgrestError(statusError));
   }
 
-  return eventId;
+  return { eventId, djs };
 }
 
 export async function bulkUpdateStatus(
   ids: string[],
   status: ReviewStatus,
-): Promise<void> {
+): Promise<EnsureLineupDjsResult | null> {
   const { error } = await supabase
     .from('draft_events')
     .update({ status, updated_at: new Date().toISOString() })
     .in('id', ids);
 
   if (error) throw new Error(formatPostgrestError(error));
+
+  if (status !== 'approved') return null;
+  return ensureDjsFromDraftLineups(ids);
 }
 
 /** Permanently remove drafts from draft_events (scraper can re-insert them later). */
@@ -203,13 +231,15 @@ export async function bulkDeleteDraftEvents(ids: string[]): Promise<void> {
 
 export async function bulkPublish(
   drafts: DraftEvent[],
-): Promise<{ succeeded: number; failed: string[] }> {
+): Promise<{ succeeded: number; failed: string[]; djs: EnsureLineupDjsResult }> {
   const failed: string[] = [];
+  const djResults: EnsureLineupDjsResult[] = [];
   let succeeded = 0;
 
   for (const draft of drafts) {
     try {
-      await publishDraftEvent(draft);
+      const { djs } = await publishDraftEvent(draft);
+      djResults.push(djs);
       succeeded++;
     } catch (err) {
       failed.push(
@@ -218,5 +248,9 @@ export async function bulkPublish(
     }
   }
 
-  return { succeeded, failed };
+  return {
+    succeeded,
+    failed,
+    djs: mergeLineupDjResults(djResults),
+  };
 }

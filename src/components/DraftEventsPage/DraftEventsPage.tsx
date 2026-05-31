@@ -15,6 +15,11 @@ import { useDraftEvents } from '../../hooks/useDraftEvents';
 import { useReferenceData } from '../../hooks/useReferenceData';
 import { useScriptRunner } from '../../hooks/useScriptRunner';
 import { syncEventDjsForDraft, updateEventDjs } from '../../lib/eventDjActions';
+import {
+  formatDraftApproveMessage,
+  formatDraftPublishMessage,
+} from '../../lib/draftApproveMessages';
+import { parseLineupText } from '../../lib/lineup';
 import { formatPostgrestError } from '../../lib/supabaseErrors';
 import { matchesSearch } from '../../utils/format';
 import type {
@@ -92,6 +97,14 @@ export function DraftEventsPage() {
     [filteredEvents, selectedIds],
   );
 
+  const publishableSelectedEvents = useMemo(
+    () =>
+      selectedEvents.filter(
+        (e) => e.status === 'approved' || e.status === 'published',
+      ),
+    [selectedEvents],
+  );
+
   const switchTab = (status: ReviewStatus) => {
     setActiveTab(status);
     setFilters(defaultFilters(status));
@@ -139,10 +152,10 @@ export function DraftEventsPage() {
     status: ReviewStatus,
   ) => {
     await runWithBusy(async () => {
-      await createDraftEvent(data, sourceId, status);
+      const { djs } = await createDraftEvent(data, sourceId, status);
       notify(
         status === 'approved'
-          ? 'Event created and approved.'
+          ? formatDraftApproveMessage(1, djs)
           : 'Event created as pending.',
         'success',
       );
@@ -174,11 +187,29 @@ export function DraftEventsPage() {
     });
   };
 
-  const handleStatusChange = async (status: ReviewStatus) => {
+  const handleStatusChange = async (
+    status: ReviewStatus,
+    formData?: DraftEventFormData,
+  ) => {
     if (!editingEvent) return;
     await runWithBusy(async () => {
-      await updateDraftStatus(editingEvent.id, status);
-      notify(`Marked as ${status}.`, 'success');
+      let djs = null;
+      if (status === 'approved' && formData) {
+        await saveDraftEvent(editingEvent.id, formData);
+        djs = await updateDraftStatus(
+          editingEvent.id,
+          status,
+          parseLineupText(formData.lineup),
+        );
+      } else {
+        djs = await updateDraftStatus(editingEvent.id, status);
+      }
+
+      if (status === 'approved') {
+        notify(formatDraftApproveMessage(1, djs), 'success');
+      } else {
+        notify(`Marked as ${status}.`, 'success');
+      }
       await refreshAfterAction();
     });
   };
@@ -191,9 +222,9 @@ export function DraftEventsPage() {
         ...editingEvent,
         ...formDataToUpdatePayload(data),
       };
-      const eventId = await publishDraftEvent(merged);
+      const { eventId, djs } = await publishDraftEvent(merged);
       await updateEventDjs(eventId, djIds);
-      notify('Event published to mobile feed.', 'success');
+      notify(formatDraftPublishMessage(1, djs), 'success');
       await refreshAfterAction();
     });
   };
@@ -201,8 +232,8 @@ export function DraftEventsPage() {
   const executeBulkApprove = async () => {
     const ids = [...selectedIds];
     await runWithBusy(async () => {
-      await bulkUpdateStatus(ids, 'approved');
-      notify(`Approved ${ids.length} event(s).`, 'success');
+      const djs = await bulkUpdateStatus(ids, 'approved');
+      notify(formatDraftApproveMessage(ids.length, djs), 'success');
       await refreshAfterAction();
     });
     setConfirmAction(null);
@@ -235,17 +266,17 @@ export function DraftEventsPage() {
   };
 
   const executeBulkPublish = async () => {
-    const toPublish = selectedEvents.filter((e) => e.status === 'approved');
+    const toPublish = publishableSelectedEvents;
     if (toPublish.length === 0) {
-      notify('Select approved events to publish.', 'error');
+      notify('Select approved or published events to publish.', 'error');
       setConfirmAction(null);
       return;
     }
 
     await runWithBusy(async () => {
-      const { succeeded, failed } = await bulkPublish(toPublish);
+      const { succeeded, failed, djs } = await bulkPublish(toPublish);
       if (succeeded > 0) {
-        notify(`Published ${succeeded} event(s).`, 'success');
+        notify(formatDraftPublishMessage(succeeded, djs), 'success');
       }
       if (failed.length > 0) {
         notify(`Some publishes failed:\n${failed.slice(0, 3).join('\n')}`, 'error');
@@ -298,7 +329,7 @@ export function DraftEventsPage() {
     },
     bulkPublish: {
       title: 'Publish selected events?',
-      message: `Publish ${selectedEvents.filter((e) => e.status === 'approved').length} approved event(s) to the events table?`,
+      message: `Publish ${publishableSelectedEvents.length} event(s) to the mobile feed? Already published events will be updated.`,
       confirmLabel: 'Publish all',
       variant: 'default' as const,
       onConfirm: () => void executeBulkPublish(),
@@ -435,7 +466,7 @@ export function DraftEventsPage() {
           <button
             type="button"
             className={styles.bulkBtn}
-            disabled={selectedIds.size === 0 || busy}
+            disabled={publishableSelectedEvents.length === 0 || busy}
             onClick={() => setConfirmAction('bulkPublish')}
           >
             Publish selected
@@ -511,7 +542,7 @@ export function DraftEventsPage() {
           busy={busy}
           onClose={() => setEditingEvent(null)}
           onSave={handleSave}
-          onApprove={() => handleStatusChange('approved')}
+          onApprove={(form) => handleStatusChange('approved', form)}
           onReject={() => handleStatusChange('rejected')}
           onPending={() => handleStatusChange('pending')}
           onPublish={handlePublish}
