@@ -4,7 +4,6 @@ import {
   ensureDjsFromLineup,
   type EnsureLineupDjsResult,
 } from './ensureLineupDjs';
-import { mergeLineupDjResults } from './draftApproveMessages';
 import { parseLineupText } from './lineup';
 import { formatPostgrestError } from './supabaseErrors';
 import type {
@@ -146,7 +145,8 @@ export async function updateDraftStatus(
  */
 export async function publishDraftEvent(
   draft: DraftEvent,
-): Promise<{ eventId: string; djs: EnsureLineupDjsResult }> {
+  options?: { skipLineupDjs?: boolean },
+): Promise<{ eventId: string; djs: EnsureLineupDjsResult | null }> {
   if (!draft.source_id || !draft.external_id) {
     throw new Error(
       'Cannot publish: source_id and external_id are required.',
@@ -191,7 +191,9 @@ export async function publishDraftEvent(
     eventId = inserted.id as string;
   }
 
-  const djs = await ensureDjsFromLineup(draft.lineup ?? []);
+  const djs = options?.skipLineupDjs
+    ? null
+    : await ensureDjsFromLineup(draft.lineup ?? []);
 
   const { error: statusError } = await supabase
     .from('draft_events')
@@ -233,13 +235,16 @@ export async function bulkPublish(
   drafts: DraftEvent[],
 ): Promise<{ succeeded: number; failed: string[]; djs: EnsureLineupDjsResult }> {
   const failed: string[] = [];
-  const djResults: EnsureLineupDjsResult[] = [];
   let succeeded = 0;
+
+  const allLineupNames = drafts.flatMap((draft) =>
+    Array.isArray(draft.lineup) ? draft.lineup : [],
+  );
+  const djs = await ensureDjsFromLineup(allLineupNames);
 
   for (const draft of drafts) {
     try {
-      const { djs } = await publishDraftEvent(draft);
-      djResults.push(djs);
+      await publishDraftEvent(draft, { skipLineupDjs: true });
       succeeded++;
     } catch (err) {
       failed.push(
@@ -251,6 +256,6 @@ export async function bulkPublish(
   return {
     succeeded,
     failed,
-    djs: mergeLineupDjResults(djResults),
+    djs,
   };
 }

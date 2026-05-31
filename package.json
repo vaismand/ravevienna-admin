@@ -14,13 +14,16 @@
     "scrape:publish-approved": "tsx scraper/publishApproved.ts",
     "enrich:djs": "tsx scripts/entries/enrich-spotify.entry.ts",
     "enrich:dj:ra": "tsx scripts/entries/enrich-ra.entry.ts",
-    "enrich:dj:soundcloud": "tsx scripts/entries/enrich-soundcloud.entry.ts"
+    "enrich:dj:soundcloud": "tsx scripts/entries/enrich-soundcloud.entry.ts",
+    "enrich:djs:soundcloud": "tsx scripts/enrichDjsFromSoundCloud.ts",
+    "search:enrich:dj:soundcloud": "tsx scripts/entries/search-enrich-soundcloud.entry.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.0",
     "axios": "^1.16.1",
     "cheerio": "^1.2.0",
     "dotenv": "^17.4.2",
+    "playwright": "^1.60.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6"
   },

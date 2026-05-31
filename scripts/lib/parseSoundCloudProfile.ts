@@ -122,6 +122,12 @@ export function truncateToSentenceLimit(text: string, maxSentences: number): str
   return sentences.slice(0, maxSentences).join(" ").trim();
 }
 
+export function formatSoundCloudBioForDj(
+  description: string | null | undefined
+): string | null {
+  return extractBioFromDescription(description);
+}
+
 function extractBioFromDescription(description: string | null | undefined): string | null {
   if (isBlank(description)) {
     return null;

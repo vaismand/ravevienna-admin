@@ -1,3 +1,5 @@
+import { isLineupFloorLabel, splitLineupCollaborations } from "../../../scripts/lib/lineupArtists.ts";
+
 const LINEUP_HEADER_REGEX =
   /^(?:line[\s-]?up|artists?|djs?|acts?|with|w\/)\s*:?\s*$/i;
 
@@ -78,6 +80,7 @@ function isValidArtistName(name: string): boolean {
   );
 
   if (!clean) return false;
+  if (isLineupFloorLabel(clean)) return false;
   if (clean.length < MIN_ARTIST_LENGTH || clean.length > MAX_ARTIST_LENGTH) {
     return false;
   }
@@ -102,6 +105,11 @@ function splitCamelCaseArtists(text: string): string[] {
 function splitArtistChunk(chunk: string): string[] {
   const clean = normalizeSpaces(chunk.replace(/^[-–—•·*]+\s*/, ""));
   if (!clean) return [];
+
+  const collaborations = splitLineupCollaborations(clean);
+  if (collaborations.length > 1) {
+    return collaborations.flatMap((part) => splitArtistChunk(part));
+  }
 
   const byDelimiters = clean
     .split(/\n+|[,;|•·]+|\s\/\s+|\s\\\s+/)

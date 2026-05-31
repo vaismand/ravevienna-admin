@@ -27,7 +27,11 @@ import styles from './DjsPage.module.css';
 
 const defaultFilters: DjFilters = { search: '', active: 'all' };
 
-type ConfirmAction = 'enrichSpotify' | 'enrichSoundcloud' | null;
+type ConfirmAction =
+  | 'enrichSpotify'
+  | 'enrichSoundcloud'
+  | 'enrichSoundcloudInactive'
+  | null;
 
 export function DjsPage() {
   const { djs, loading, error, reload } = useDjs();
@@ -131,11 +135,15 @@ export function DjsPage() {
     }
   };
 
-  const executeEnrichSoundcloud = async () => {
+  const executeEnrichSoundcloud = async (inactiveOnly: boolean) => {
     setConfirmAction(null);
     try {
-      const finished = await runScript('enrich-soundcloud');
-      await handleScriptFinished('SoundCloud enrichment', finished);
+      const args = inactiveOnly ? ['--inactive-only'] : [];
+      const label = inactiveOnly
+        ? 'SoundCloud enrichment (inactive DJs)'
+        : 'SoundCloud enrichment';
+      const finished = await runScript('enrich-soundcloud', args);
+      await handleScriptFinished(label, finished);
     } catch (err) {
       notify(
         err instanceof Error
@@ -202,6 +210,15 @@ export function DjsPage() {
             }
             disabled={scriptApiConfigured === false || scriptRunning}
             onClick={() => setConfirmAction('enrichSoundcloud')}
+          />
+          <ScriptRunButton
+            label="SoundCloud → inactive"
+            runningLabel="SoundCloud (inactive)…"
+            running={
+              scriptRunning && scriptJob?.scriptId === 'enrich-soundcloud'
+            }
+            disabled={scriptApiConfigured === false || scriptRunning}
+            onClick={() => setConfirmAction('enrichSoundcloudInactive')}
           />
           <button
             type="button"
@@ -291,9 +308,18 @@ export function DjsPage() {
       <ConfirmDialog
         open={confirmAction === 'enrichSoundcloud'}
         title="Run SoundCloud enrichment?"
-        message="For DJs with a SoundCloud URL, fetch avatar, bio (up to 4 sentences), and social links when available. Only empty fields are filled unless you pass overwrite flags via CLI."
+        message="For active DJs with a SoundCloud URL, fetch avatar, bio (up to 4 sentences), and social links when available. Only empty fields are filled."
         confirmLabel="Run enrichment"
-        onConfirm={() => void executeEnrichSoundcloud()}
+        onConfirm={() => void executeEnrichSoundcloud(false)}
+        onCancel={() => setConfirmAction(null)}
+      />
+
+      <ConfirmDialog
+        open={confirmAction === 'enrichSoundcloudInactive'}
+        title="Enrich inactive DJs from SoundCloud?"
+        message="Same as SoundCloud enrichment, but only for inactive DJs that already have a SoundCloud URL. Useful for draft lineup DJs before you activate them."
+        confirmLabel="Run for inactive"
+        onConfirm={() => void executeEnrichSoundcloud(true)}
         onCancel={() => setConfirmAction(null)}
       />
 

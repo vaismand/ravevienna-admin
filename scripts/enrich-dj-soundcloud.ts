@@ -7,6 +7,7 @@
  *   npm run enrich:dj:soundcloud -- --limit 10
  *   npm run enrich:dj:soundcloud -- --name "saschka"
  *   npm run enrich:dj:soundcloud -- --all --overwrite-images --overwrite-bio
+ *   npm run enrich:dj:soundcloud -- --inactive-only
  *
  * Requires: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (.env.scripts)
  */
@@ -28,6 +29,7 @@ type CliOptions = {
   limit: number | null;
   all: boolean;
   dryRun: boolean;
+  inactiveOnly: boolean;
   nameFilter: string | null;
   overwriteImages: boolean;
   overwriteBio: boolean;
@@ -53,6 +55,7 @@ function parseArgs(argv: string[]): CliOptions {
     limit: null,
     all: false,
     dryRun: false,
+    inactiveOnly: false,
     nameFilter: null,
     overwriteImages: false,
     overwriteBio: false,
@@ -64,6 +67,8 @@ function parseArgs(argv: string[]): CliOptions {
 
     if (arg === "--all") {
       options.all = true;
+    } else if (arg === "--inactive-only") {
+      options.inactiveOnly = true;
     } else if (arg === "--dry-run") {
       options.dryRun = true;
     } else if (arg === "--overwrite-images") {
@@ -128,7 +133,7 @@ async function fetchDjs(
   let query = supabase
     .from("djs")
     .select("*")
-    .eq("is_active", true)
+    .eq("is_active", options.inactiveOnly ? false : true)
     .not("soundcloud_url", "is", null)
     .neq("soundcloud_url", "")
     .order("name", { ascending: true });
@@ -267,8 +272,9 @@ export async function runEnrichDjSoundcloud(
     errors: 0,
   };
 
+  const audience = options.inactiveOnly ? "inactive" : "active";
   console.log(
-    `DJ SoundCloud enrichment${options.dryRun ? " (dry run)" : ""} — ${djs.length} DJ(s) to process`
+    `DJ SoundCloud enrichment (${audience})${options.dryRun ? " (dry run)" : ""} — ${djs.length} DJ(s) to process`
   );
 
   for (let index = 0; index < djs.length; index += 1) {

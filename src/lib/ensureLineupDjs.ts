@@ -1,10 +1,89 @@
 import { supabase } from './supabase';
 import { slugFromName } from './djUtils';
 import { formatPostgrestError } from './supabaseErrors';
+import {
+  escapeIlikePattern,
+  lineupNamesMatch,
+  normalizeLineupArtistName,
+  prepareLineupForDjImport,
+} from '../../scripts/lib/lineupArtists';
 
 export interface EnsureLineupDjsResult {
   created: string[];
   existing: string[];
+}
+
+function isUniqueViolation(error: { code?: string }): boolean {
+  return error.code === '23505';
+}
+
+async function findDjIdBySlug(slug: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('djs')
+    .select('id')
+    .eq('slug', slug)
+    .limit(1);
+
+  if (error) throw new Error(formatPostgrestError(error));
+  return data?.[0]?.id ?? null;
+}
+
+async function findDjIdByName(name: string): Promise<string | null> {
+  const normalized = normalizeLineupArtistName(name);
+  if (!normalized) return null;
+
+  const { data, error } = await supabase
+    .from('djs')
+    .select('id, name')
+    .ilike('name', escapeIlikePattern(normalized))
+    .limit(10);
+
+  if (error) throw new Error(formatPostgrestError(error));
+
+  for (const row of data ?? []) {
+    if (lineupNamesMatch(row.name ?? '', normalized)) {
+      return row.id as string;
+    }
+  }
+
+  return null;
+}
+
+async function findDjIdBySlugFamily(
+  baseSlug: string,
+  normalizedName: string,
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('djs')
+    .select('id, name, slug')
+    .or(`slug.eq.${baseSlug},slug.like.${baseSlug}-%`)
+    .limit(25);
+
+  if (error) throw new Error(formatPostgrestError(error));
+
+  for (const row of data ?? []) {
+    if (lineupNamesMatch(row.name ?? '', normalizedName)) {
+      return row.id as string;
+    }
+  }
+
+  return null;
+}
+
+async function findDjByNameOrSlug(name: string): Promise<string | null> {
+  const normalized = normalizeLineupArtistName(name);
+  if (!normalized) return null;
+
+  const baseSlug = slugFromName(normalized);
+  if (baseSlug) {
+    const byExactSlug = await findDjIdBySlug(baseSlug);
+    if (byExactSlug) return byExactSlug;
+
+    const bySlugFamily = await findDjIdBySlugFamily(baseSlug, normalized);
+    if (bySlugFamily) return bySlugFamily;
+  }
+
+  return findDjIdByName(normalized);
 }
 
 async function ensureUniqueSlug(baseSlug: string): Promise<string> {
@@ -12,57 +91,12 @@ async function ensureUniqueSlug(baseSlug: string): Promise<string> {
   let suffix = 2;
 
   while (true) {
-    const { data, error } = await supabase
-      .from('djs')
-      .select('id')
-      .eq('slug', candidate)
-      .maybeSingle();
-
-    if (error) throw new Error(formatPostgrestError(error));
-    if (!data) return candidate;
+    const taken = await findDjIdBySlug(candidate);
+    if (!taken) return candidate;
 
     candidate = `${baseSlug}-${suffix}`;
     suffix += 1;
   }
-}
-
-async function findDjByNameOrSlug(name: string): Promise<{ id: string } | null> {
-  const slug = slugFromName(name);
-  if (slug) {
-    const { data, error } = await supabase
-      .from('djs')
-      .select('id')
-      .eq('slug', slug)
-      .maybeSingle();
-
-    if (error) throw new Error(formatPostgrestError(error));
-    if (data) return data;
-  }
-
-  const { data, error } = await supabase
-    .from('djs')
-    .select('id')
-    .ilike('name', name.trim())
-    .maybeSingle();
-
-  if (error) throw new Error(formatPostgrestError(error));
-  return data;
-}
-
-function uniqueLineupNames(lineup: string[]): string[] {
-  const seen = new Set<string>();
-  const names: string[] = [];
-
-  for (const raw of lineup) {
-    const name = raw.trim();
-    if (!name) continue;
-    const key = name.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    names.push(name);
-  }
-
-  return names;
 }
 
 /**
@@ -72,14 +106,22 @@ function uniqueLineupNames(lineup: string[]): string[] {
 export async function ensureDjsFromLineup(
   lineup: string[] | null | undefined,
 ): Promise<EnsureLineupDjsResult> {
-  const names = uniqueLineupNames(lineup ?? []);
+  const names = prepareLineupForDjImport(lineup ?? []);
   const created: string[] = [];
   const existing: string[] = [];
+  const resolvedNames = new Set<string>();
 
   for (const name of names) {
-    const found = await findDjByNameOrSlug(name);
-    if (found) {
+    const dedupeKey = name.toLowerCase();
+    if (resolvedNames.has(dedupeKey)) {
       existing.push(name);
+      continue;
+    }
+
+    const existingId = await findDjByNameOrSlug(name);
+    if (existingId) {
+      existing.push(name);
+      resolvedNames.add(dedupeKey);
       continue;
     }
 
@@ -106,8 +148,17 @@ export async function ensureDjsFromLineup(
       updated_at: now,
     });
 
-    if (error) throw new Error(formatPostgrestError(error));
+    if (error) {
+      if (isUniqueViolation(error)) {
+        existing.push(name);
+        resolvedNames.add(dedupeKey);
+        continue;
+      }
+      throw new Error(formatPostgrestError(error));
+    }
+
     created.push(name);
+    resolvedNames.add(dedupeKey);
   }
 
   return { created, existing };
