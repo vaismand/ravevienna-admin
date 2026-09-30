@@ -79,9 +79,12 @@ npm run scrape:restore-drafts         # fix draft status after bad scrape run
 npm run scrape:publish-approved       # publish approved drafts to events
 npm run enrich:djs -- --dry-run       # Spotify enrichment (bulk)
 npm run enrich:dj:ra -- --url "…" --name "…" --dry-run   # RA enrichment (single DJ)
+npm run search:enrich:djs -- --dry-run --limit 10       # SoundCloud + RA search (preview)
 ```
 
-See [docs/enrich-dj-ra.md](docs/enrich-dj-ra.md) for RA enrichment details.
+`search:enrich:djs` looks up each DJ on SoundCloud (public API v2, no login) and Resident Advisor. A dry run is the default and writes `scripts/output/dj-search-enrich.json` plus `.md`. It does not update the database. Pass `--write` to apply only auto-confident matches; ambiguous names stay in the review section. `--force` is required to replace fields that already have a value. `--slug` and `--only-empty` limit the run to one DJ or to rows that are still missing profile data.
+
+See [docs/enrich-dj-ra.md](docs/enrich-dj-ra.md) for single-URL RA enrichment.
 
 ## Database tables used
 
