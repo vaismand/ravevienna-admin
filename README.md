@@ -82,7 +82,7 @@ npm run enrich:dj:ra -- --url "…" --name "…" --dry-run   # RA enrichment (si
 npm run search:enrich:djs -- --dry-run --limit 10       # SoundCloud + RA search (preview)
 ```
 
-`search:enrich:djs` looks up each DJ on SoundCloud (public API v2, no login) and Resident Advisor. A dry run is the default and writes `scripts/output/dj-search-enrich.json` plus `.md`. It does not update the database. Pass `--write` to apply only auto-confident matches; ambiguous names stay in the review section. `--force` is required to replace fields that already have a value. `--active --linked` limits the run to active DJs that are on events, highest event count first. `--slug` and `--only-empty` limit the run further.
+`search:enrich:djs` looks up each DJ on SoundCloud (public API v2, no login) and Resident Advisor. A dry run is the default and writes `scripts/output/dj-search-enrich.json` plus `.md`. It does not update the database. Pass `--write` to apply only auto-confident matches; ambiguous names stay in the review section. `--force` is required to replace fields that already have a value. `--active --linked` limits the run to active DJs that are on events, highest event count first. `--slug` and `--only-empty` limit the run further. A saved `soundcloud_url` is fetched directly and treated as that DJ's SoundCloud account; a different account is not chosen. An RA-only auto match needs an Austria or Vienna home location (playing in Austria only adds score) or agreement with that confirmed SoundCloud profile.
 
 See [docs/enrich-dj-ra.md](docs/enrich-dj-ra.md) for single-URL RA enrichment.
 

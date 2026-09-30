@@ -1,4 +1,5 @@
 import { bestSoundCloudAvatarUrl } from "./parseSoundCloudProfile.ts";
+import { canonicalSoundCloudUrl } from "./profileLinks.ts";
 import { RequestPacer, ResponseCache } from "./responseCache.ts";
 
 const USER_AGENT =
@@ -255,5 +256,25 @@ export class SoundCloudPublicClient {
     });
     const payload = await this.getJson(`/users/${userId}/tracks?${params.toString()}`);
     return genresFromSoundCloudTracks(payload);
+  }
+
+  /**
+   * Resolve a saved profile URL (trailing slash, case, and m. subdomain ignored
+   * by the caller via canonicalSoundCloudUrl) to that user. Never a search hit.
+   */
+  async resolveUser(profileUrl: string): Promise<SoundCloudPublicUser | null> {
+    const canonical = canonicalSoundCloudUrl(profileUrl);
+    if (!canonical) {
+      return null;
+    }
+
+    const params = new URLSearchParams({ url: canonical });
+    const payload = await this.getJson(`/resolve?${params.toString()}`);
+    const record = asRecord(payload);
+    const kind = asString(record?.kind);
+    if (kind && kind !== "user") {
+      return null;
+    }
+    return mapUser(payload);
   }
 }

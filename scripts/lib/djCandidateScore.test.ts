@@ -9,7 +9,7 @@ import {
   type DjProfileCandidate,
 } from "./djCandidateScore.ts";
 import { planDjFieldUpdates, type DjEnrichmentRow } from "./djFieldPlan.ts";
-import { matchDjProfiles } from "./matchDjProfiles.ts";
+import { matchDjProfiles, raOnlyAutoAllowed } from "./matchDjProfiles.ts";
 
 function candidate(
   overrides: Partial<DjProfileCandidate> & Pick<DjProfileCandidate, "name">
@@ -592,5 +592,383 @@ describe("matchDjProfiles", () => {
     assert.equal(result.raMerge, "applied");
     assert.equal(result.updates.country, "Austria");
     assert.equal(result.soundcloud.status, "none");
+  });
+
+  it("treats the saved SoundCloud URL as a confirmed match and ignores other accounts", () => {
+    const result = matchDjProfiles({
+      dj: emptyDj({
+        name: "ANATOL",
+        slug: "anatol",
+        soundcloud_url: "https://m.soundcloud.com/Anatol-Official/",
+      }),
+      soundcloud: [
+        candidate({
+          name: "Anatol Official",
+          username: "anatol-official",
+          followers: 40,
+          bio: "Official Anatol page.",
+          profileUrl: "https://soundcloud.com/anatol-official",
+          soundcloudUrl: "https://soundcloud.com/anatol-official",
+        }),
+        candidate({
+          name: "ANATOL",
+          username: "anatolol",
+          country: "Austria",
+          city: "Vienna",
+          followers: 9000,
+          genres: ["techno"],
+          profileUrl: "https://soundcloud.com/anatolol",
+          soundcloudUrl: "https://soundcloud.com/anatolol",
+        }),
+      ],
+      ra: [
+        candidate({
+          source: "ra",
+          name: "ANATOL",
+          country: "Austria",
+          city: "Vienna",
+          followers: 80,
+          websiteUrl: "https://anatolol.example",
+          profileUrl: "https://ra.co/dj/anatolol",
+          soundcloudUrl: "https://soundcloud.com/anatolol",
+        }),
+      ],
+      evidence: { soundcloudUrls: [], instagramUrls: [] },
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(result.soundcloud.status, "auto");
+    assert.equal(
+      result.soundcloud.chosen?.candidate.profileUrl,
+      "https://soundcloud.com/anatol-official"
+    );
+    assert.ok(result.soundcloud.chosen?.reasons.includes("saved_soundcloud_url"));
+    assert.equal(result.updates.bio, "Official Anatol page.");
+    assert.equal(result.updates.website_url, undefined);
+    assert.equal(result.raMerge, "skipped_conflict");
+    assert.equal(result.ra.status, "review");
+  });
+
+  it("does not adopt a different SoundCloud account when the saved URL is missing from search", () => {
+    const result = matchDjProfiles({
+      dj: emptyDj({
+        name: "Crazy Sonic",
+        slug: "crazy-sonic",
+        soundcloud_url: "https://soundcloud.com/crazy-sonic",
+      }),
+      soundcloud: [
+        candidate({
+          name: "Crazy Sonic",
+          country: "Austria",
+          city: "Vienna",
+          followers: 11,
+          genres: ["techno"],
+          profileUrl: "https://soundcloud.com/crazysonic",
+          soundcloudUrl: "https://soundcloud.com/crazysonic",
+        }),
+      ],
+      ra: [
+        candidate({
+          source: "ra",
+          name: "Crazy Sonic",
+          country: "Austria",
+          city: "Vienna",
+          websiteUrl: "https://crazysonic.example",
+          profileUrl: "https://ra.co/dj/crazysonic",
+          soundcloudUrl: "https://soundcloud.com/crazysonic",
+        }),
+      ],
+      evidence: { soundcloudUrls: [], instagramUrls: [] },
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(result.soundcloud.status, "none");
+    assert.equal(result.soundcloud.chosen, null);
+    assert.equal(result.updates.country, undefined);
+    assert.equal(result.updates.website_url, undefined);
+    assert.equal(result.ra.status, "review");
+    assert.equal(result.raMerge, "skipped_conflict");
+  });
+
+  it("auto-applies a saved SoundCloud profile that would otherwise stay in review", () => {
+    const result = matchDjProfiles({
+      dj: emptyDj({
+        name: "Tomagan",
+        slug: "tomagan",
+        soundcloud_url: "https://soundcloud.com/Tomagan/",
+      }),
+      soundcloud: [
+        candidate({
+          name: "Tomagan",
+          followers: 30,
+          bio: "Tomagan.",
+          profileUrl: "https://soundcloud.com/tomagan",
+          soundcloudUrl: "https://soundcloud.com/tomagan",
+        }),
+        candidate({
+          name: "Tomagan",
+          followers: 25,
+          profileUrl: "https://soundcloud.com/tomagan-live",
+          soundcloudUrl: "https://soundcloud.com/tomagan-live",
+        }),
+      ],
+      ra: [],
+      evidence: { soundcloudUrls: [], instagramUrls: [] },
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(result.soundcloud.status, "auto");
+    assert.equal(result.soundcloud.chosen?.candidate.profileUrl, "https://soundcloud.com/tomagan");
+    assert.equal(result.updates.bio, "Tomagan.");
+  });
+
+  it("does not auto-apply an RA profile whose home is Prague just because it plays Vienna", () => {
+    const prague = candidate({
+      source: "ra",
+      name: "Aras",
+      country: "Czechia",
+      city: "Prague",
+      followers: 1,
+      genres: ["techno"],
+      playsVienna: true,
+      playsAustria: true,
+      profileUrl: "https://ra.co/dj/aras",
+      soundcloudUrl: null,
+    });
+    assert.equal(raOnlyAutoAllowed(prague, 10), false);
+    assert.equal(raOnlyAutoAllowed(prague, null), false);
+
+    const result = matchDjProfiles({
+      dj: emptyDj({ name: "Aras", slug: "aras" }),
+      soundcloud: [],
+      ra: [prague],
+      evidence: { soundcloudUrls: [], instagramUrls: [] },
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(result.ra.status, "review");
+    assert.equal(result.raMerge, "not_used");
+    assert.equal(result.updates.country, undefined);
+  });
+
+  it("does not treat plays-in-Austria as corroboration for an RA profile with no home location", () => {
+    const result = matchDjProfiles({
+      dj: emptyDj({ name: "Comrade Martin", slug: "comrade-martin" }),
+      soundcloud: [],
+      ra: [
+        candidate({
+          source: "ra",
+          name: "Comrade Martin",
+          city: null,
+          country: null,
+          followers: 2,
+          playsVienna: true,
+          playsAustria: true,
+          profileUrl: "https://ra.co/dj/comrademartin",
+          soundcloudUrl: null,
+        }),
+      ],
+      evidence: { soundcloudUrls: [], instagramUrls: [] },
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(result.ra.status, "review");
+    assert.equal(result.updates.country, undefined);
+    assert.deepEqual(result.updates, {});
+  });
+
+  it("keeps a Vienna RA-only profile in review when the margin is under 12", () => {
+    const vienna = candidate({
+      source: "ra",
+      name: "Stimming",
+      country: "Austria",
+      city: "Vienna",
+      followers: 300,
+      profileUrl: "https://ra.co/dj/stimming",
+      soundcloudUrl: null,
+    });
+    assert.equal(raOnlyAutoAllowed(vienna, 10), false);
+    assert.equal(raOnlyAutoAllowed(vienna, null), true);
+    assert.equal(raOnlyAutoAllowed(vienna, 12), true);
+
+    const result = matchDjProfiles({
+      dj: emptyDj({ name: "Stimming", slug: "stimming" }),
+      soundcloud: [],
+      ra: [
+        vienna,
+        candidate({
+          source: "ra",
+          name: "Stimming",
+          country: "Austria",
+          city: "Vienna",
+          followers: 100,
+          profileUrl: "https://ra.co/dj/stimming-other",
+          soundcloudUrl: null,
+        }),
+      ],
+      evidence: { soundcloudUrls: [], instagramUrls: [] },
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(result.ra.status, "review");
+    assert.equal(result.updates.country, undefined);
+  });
+
+  it("still applies a foreign RA profile when it matches the confirmed SoundCloud account", () => {
+    const result = matchDjProfiles({
+      dj: emptyDj({
+        name: "Aras",
+        slug: "aras",
+        soundcloud_url: "https://soundcloud.com/aras",
+      }),
+      soundcloud: [
+        candidate({
+          name: "Aras",
+          country: "Austria",
+          city: "Vienna",
+          followers: 400,
+          genres: ["techno"],
+          profileUrl: "https://soundcloud.com/aras",
+          soundcloudUrl: "https://soundcloud.com/aras",
+        }),
+      ],
+      ra: [
+        candidate({
+          source: "ra",
+          name: "Aras",
+          country: "Czechia",
+          city: "Prague",
+          followers: 1,
+          playsVienna: true,
+          websiteUrl: "https://aras.example",
+          profileUrl: "https://ra.co/dj/aras",
+          soundcloudUrl: "https://soundcloud.com/aras",
+        }),
+      ],
+      evidence: { soundcloudUrls: [], instagramUrls: [] },
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(result.soundcloud.status, "auto");
+    assert.equal(result.ra.status, "auto");
+    assert.equal(result.raMerge, "applied");
+    assert.equal(result.updates.country, "Austria");
+    assert.equal(result.updates.website_url, "https://aras.example");
+  });
+
+  it("prefers the tied RA profile whose Instagram matches the saved account", () => {
+    const result = matchDjProfiles({
+      dj: emptyDj({
+        name: "Gerald VDH",
+        slug: "gerald-vdh",
+        soundcloud_url: "https://soundcloud.com/geraldvdh",
+        instagram_url: "https://instagram.com/geraldvdh",
+      }),
+      soundcloud: [
+        candidate({
+          name: "Gerald VDH",
+          country: "Austria",
+          city: "Vienna",
+          followers: 400,
+          genres: ["techno"],
+          instagramUrl: null,
+          profileUrl: "https://soundcloud.com/geraldvdh",
+          soundcloudUrl: "https://soundcloud.com/geraldvdh",
+        }),
+      ],
+      ra: [
+        candidate({
+          source: "ra",
+          name: "Gerald VDH",
+          country: "Austria",
+          city: "Vienna",
+          followers: 50,
+          websiteUrl: "https://other.example",
+          instagramUrl: "https://instagram.com/gerald-other",
+          profileUrl: "https://ra.co/dj/geraldvanderhint",
+          soundcloudUrl: null,
+        }),
+        candidate({
+          source: "ra",
+          name: "Gerald VDH",
+          country: "Austria",
+          city: "Vienna",
+          followers: 50,
+          websiteUrl: "https://gerald.example",
+          instagramUrl: "https://instagram.com/geraldvdh",
+          profileUrl: "https://ra.co/dj/geraldvdh",
+          soundcloudUrl: null,
+        }),
+      ],
+      evidence: { soundcloudUrls: [], instagramUrls: [] },
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(result.ra.status, "auto");
+    assert.equal(result.ra.chosen?.candidate.profileUrl, "https://ra.co/dj/geraldvdh");
+    assert.equal(result.raMerge, "applied");
+    assert.equal(result.updates.website_url, "https://gerald.example");
+  });
+
+  it("leaves tied RA profiles in review when neither link matches", () => {
+    const result = matchDjProfiles({
+      dj: emptyDj({
+        name: "Gerald VDH",
+        slug: "gerald-vdh",
+        soundcloud_url: "https://soundcloud.com/geraldvdh",
+        instagram_url: "https://instagram.com/geraldvdh",
+      }),
+      soundcloud: [
+        candidate({
+          name: "Gerald VDH",
+          country: "Austria",
+          city: "Vienna",
+          followers: 400,
+          genres: ["techno"],
+          profileUrl: "https://soundcloud.com/geraldvdh",
+          soundcloudUrl: "https://soundcloud.com/geraldvdh",
+        }),
+      ],
+      ra: [
+        candidate({
+          source: "ra",
+          name: "Gerald VDH",
+          country: "Austria",
+          city: "Vienna",
+          followers: 50,
+          websiteUrl: "https://hint.example",
+          instagramUrl: "https://instagram.com/gerald-hint",
+          profileUrl: "https://ra.co/dj/geraldvanderhint",
+          soundcloudUrl: null,
+        }),
+        candidate({
+          source: "ra",
+          name: "Gerald VDH",
+          country: "Austria",
+          city: "Vienna",
+          followers: 50,
+          websiteUrl: "https://vdh.example",
+          instagramUrl: "https://instagram.com/gerald-vdh-live",
+          profileUrl: "https://ra.co/dj/geraldvdh",
+          soundcloudUrl: null,
+        }),
+      ],
+      evidence: { soundcloudUrls: [], instagramUrls: [] },
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(result.ra.status, "review");
+    assert.equal(result.ra.chosen, null);
+    assert.equal(result.raMerge, "not_used");
+    assert.equal(result.updates.website_url, undefined);
   });
 });

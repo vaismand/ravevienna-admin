@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { applyRaArtistDetail, parseRaSearchPayload } from "./raArtistSearch.ts";
-import { selectDjsForEnrichment } from "./searchEnrichDjs.ts";
+import { selectDjsForEnrichment, soundCloudLookupPlan } from "./searchEnrichDjs.ts";
+import { SoundCloudPublicClient } from "./soundcloudPublicClient.ts";
 import type { DjEnrichmentRow } from "./djFieldPlan.ts";
 import {
   extractSoundCloudAssetUrls,
@@ -139,6 +140,65 @@ function djRow(
   };
   return { ...row, raw: row };
 }
+
+describe("soundCloudLookupPlan", () => {
+  it("fetches a saved profile URL and does not search", () => {
+    assert.deepEqual(soundCloudLookupPlan(null), { mode: "search" });
+    assert.deepEqual(soundCloudLookupPlan("  "), { mode: "search" });
+    assert.deepEqual(soundCloudLookupPlan("https://m.soundcloud.com/Fourtex/"), {
+      mode: "saved",
+      url: "https://soundcloud.com/fourtex",
+    });
+    assert.deepEqual(soundCloudLookupPlan("not a url"), { mode: "invalid" });
+  });
+});
+
+describe("SoundCloud resolve", () => {
+  it("resolves the saved profile URL instead of searching users", async () => {
+    const calls: string[] = [];
+    const client = new SoundCloudPublicClient({
+      clientId: "a".repeat(32),
+      fetchImpl: async (input) => {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+        calls.push(url);
+        if (url.includes("/resolve")) {
+          return new Response(
+            JSON.stringify({
+              kind: "user",
+              id: 42,
+              username: "Tomagan",
+              permalink: "tomagan",
+              permalink_url: "https://soundcloud.com/tomagan",
+              full_name: "Tomagan",
+              followers_count: 100,
+              city: "Vienna",
+              country_code: "AT",
+            }),
+            { status: 200 }
+          );
+        }
+        return new Response("missing", { status: 404 });
+      },
+    });
+
+    const user = await client.resolveUser("https://m.soundcloud.com/Tomagan/");
+    assert.equal(user?.permalink, "tomagan");
+    assert.equal(user?.profileUrl, "https://soundcloud.com/tomagan");
+    assert.equal(user?.followers, 100);
+    assert.equal(calls.some((url) => url.includes("/search/")), false);
+    assert.equal(calls.some((url) => url.includes("/resolve")), true);
+    assert.match(calls[0] ?? "", /soundcloud\.com%2Ftomagan|soundcloud\.com\/tomagan/);
+  });
+
+  it("ignores a resolve payload that is not a user", async () => {
+    const client = new SoundCloudPublicClient({
+      clientId: "b".repeat(32),
+      fetchImpl: async () =>
+        new Response(JSON.stringify({ kind: "track", id: 7, title: "Set" }), { status: 200 }),
+    });
+    assert.equal(await client.resolveUser("https://soundcloud.com/tomagan"), null);
+  });
+});
 
 describe("selectDjsForEnrichment", () => {
   it("keeps active DJs that are linked to events, highest count first", () => {

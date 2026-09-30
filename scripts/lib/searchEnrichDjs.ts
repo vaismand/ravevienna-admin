@@ -19,7 +19,7 @@ import {
   fetchSoundCloudProfile,
   formatSoundCloudBioForDj,
 } from "./parseSoundCloudProfile.ts";
-import { extractProfileLinks } from "./profileLinks.ts";
+import { canonicalSoundCloudUrl, extractProfileLinks } from "./profileLinks.ts";
 import { normalizeCountryName } from "./countryNames.ts";
 import {
   RaArtistClient,
@@ -566,7 +566,14 @@ export async function searchEnrichDjs(
         continue;
       }
 
-      const users = await loadSoundCloudUsers(soundcloud, cache, pacer, dj.name, warnings);
+      const users = await loadSoundCloudUsers(
+        soundcloud,
+        cache,
+        pacer,
+        dj.name,
+        dj.soundcloud_url,
+        warnings
+      );
       const raResult = await ra.searchArtists(dj.name, 5);
       if (raResult.error) {
         warnings.push(raResult.error);
@@ -723,13 +730,118 @@ function formatConsoleLine(
   return `[skip] ${dj.name}${raError ? ` — ${raError}` : ""}`;
 }
 
+/** Saved profile URLs are fetched directly. Search is only for DJs with no URL. */
+export function soundCloudLookupPlan(
+  savedUrl: string | null | undefined
+): { mode: "search" } | { mode: "saved"; url: string } | { mode: "invalid" } {
+  if (!savedUrl?.trim()) {
+    return { mode: "search" };
+  }
+  const url = canonicalSoundCloudUrl(savedUrl);
+  if (!url) {
+    return { mode: "invalid" };
+  }
+  return { mode: "saved", url };
+}
+
+async function readSoundCloudSocials(
+  cache: ResponseCache,
+  pacer: RequestPacer,
+  profileUrl: string,
+  warnings: string[],
+  label: string
+): Promise<Awaited<ReturnType<typeof fetchSoundCloudProfile>> | null> {
+  const key = `sc-profile:${profileUrl}`;
+  try {
+    const cached = await cache.get(key);
+    if (cached) {
+      return JSON.parse(cached) as Awaited<ReturnType<typeof fetchSoundCloudProfile>>;
+    }
+    await pacer.wait();
+    const parsed = await fetchSoundCloudProfile(profileUrl);
+    await cache.set(key, JSON.stringify(parsed));
+    return parsed;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    warnings.push(`SoundCloud profile ${label}: ${message}`);
+    return null;
+  }
+}
+
+async function withSoundCloudDetails(
+  client: SoundCloudPublicClient,
+  cache: ResponseCache,
+  pacer: RequestPacer,
+  user: SoundCloudPublicUser,
+  warnings: string[]
+): Promise<DjProfileCandidate> {
+  try {
+    user.genres = await client.userGenres(user.id);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    warnings.push(`SoundCloud genres for @${user.permalink}: ${message}`);
+  }
+  const socials = await readSoundCloudSocials(
+    cache,
+    pacer,
+    user.profileUrl,
+    warnings,
+    `@${user.permalink}`
+  );
+  return soundcloudCandidate(user, socials);
+}
+
+async function loadAnchoredSoundCloudUser(
+  client: SoundCloudPublicClient,
+  cache: ResponseCache,
+  pacer: RequestPacer,
+  savedUrl: string,
+  warnings: string[]
+): Promise<DjProfileCandidate[]> {
+  const plan = soundCloudLookupPlan(savedUrl);
+  if (plan.mode === "invalid") {
+    warnings.push(`Saved SoundCloud URL is not a profile: ${savedUrl}`);
+    return [];
+  }
+  if (plan.mode !== "saved") {
+    return [];
+  }
+
+  let user: SoundCloudPublicUser | null;
+  try {
+    user = await client.resolveUser(plan.url);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    warnings.push(`SoundCloud resolve failed for ${plan.url}: ${message}`);
+    return [];
+  }
+  if (!user) {
+    warnings.push(`Saved SoundCloud URL did not resolve to a user: ${plan.url}`);
+    return [];
+  }
+
+  return [await withSoundCloudDetails(client, cache, pacer, user, warnings)];
+}
+
 async function loadSoundCloudUsers(
   client: SoundCloudPublicClient,
   cache: ResponseCache,
   pacer: RequestPacer,
   djName: string,
+  savedSoundcloudUrl: string | null,
   warnings: string[]
 ): Promise<DjProfileCandidate[]> {
+  const plan = soundCloudLookupPlan(savedSoundcloudUrl);
+  if (plan.mode === "saved" || plan.mode === "invalid") {
+    return loadAnchoredSoundCloudUser(
+      client,
+      cache,
+      pacer,
+      savedSoundcloudUrl ?? "",
+      warnings
+    );
+  }
+
   let users: SoundCloudPublicUser[];
   try {
     users = await client.searchUsers(djName, 8);
@@ -746,6 +858,7 @@ async function loadSoundCloudUsers(
     .filter((user) => tierRank(djName, user) < 2)
     .slice(0, 8);
 
+  const socialsById = new Map<number, Awaited<ReturnType<typeof fetchSoundCloudProfile>> | null>();
   for (const user of interesting) {
     try {
       user.genres = await client.userGenres(user.id);
@@ -754,25 +867,11 @@ async function loadSoundCloudUsers(
       warnings.push(`SoundCloud genres for @${user.permalink}: ${message}`);
     }
   }
-
-  const socialsById = new Map<number, Awaited<ReturnType<typeof fetchSoundCloudProfile>> | null>();
   for (const user of interesting.slice(0, 2)) {
-    const key = `sc-profile:${user.profileUrl}`;
-    try {
-      const cached = await cache.get(key);
-      if (cached) {
-        socialsById.set(user.id, JSON.parse(cached) as Awaited<ReturnType<typeof fetchSoundCloudProfile>>);
-        continue;
-      }
-      await pacer.wait();
-      const parsed = await fetchSoundCloudProfile(user.profileUrl);
-      socialsById.set(user.id, parsed);
-      await cache.set(key, JSON.stringify(parsed));
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      warnings.push(`SoundCloud profile @${user.permalink}: ${message}`);
-      socialsById.set(user.id, null);
-    }
+    socialsById.set(
+      user.id,
+      await readSoundCloudSocials(cache, pacer, user.profileUrl, warnings, `@${user.permalink}`)
+    );
   }
 
   return users.map((user) => soundcloudCandidate(user, socialsById.get(user.id) ?? null));
