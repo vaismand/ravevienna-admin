@@ -107,6 +107,10 @@ export type SearchEnrichDjsOptions = {
   slugs?: string[];
   limit?: number | null;
   onlyEmpty?: boolean;
+  /** `djs.is_active = true` */
+  active?: boolean;
+  /** DJs with at least one `event_djs` row, highest event count first */
+  linked?: boolean;
   dryRun?: boolean;
   force?: boolean;
   outputDir?: string | null;
@@ -287,6 +291,72 @@ async function detectColumns(supabase: SupabaseClient): Promise<Set<string>> {
   return new Set(Object.keys(row));
 }
 
+export function selectDjsForEnrichment(
+  djs: DjEnrichmentRow[],
+  eventCounts: Map<string, number>,
+  options: Pick<SearchEnrichDjsOptions, "active" | "linked" | "onlyEmpty" | "limit">
+): DjEnrichmentRow[] {
+  let rows = djs;
+
+  if (options.active) {
+    rows = rows.filter((dj) => dj.raw.is_active === true);
+  }
+
+  if (options.linked) {
+    rows = rows
+      .filter((dj) => (eventCounts.get(dj.id) ?? 0) > 0)
+      .sort((a, b) => {
+        const byCount = (eventCounts.get(b.id) ?? 0) - (eventCounts.get(a.id) ?? 0);
+        if (byCount !== 0) {
+          return byCount;
+        }
+        return a.name.localeCompare(b.name);
+      });
+  }
+
+  if (options.onlyEmpty) {
+    rows = rows.filter(hasEmptyTarget);
+  }
+  if (options.limit != null) {
+    rows = rows.slice(0, options.limit);
+  }
+
+  return rows;
+}
+
+async function loadEventCounts(supabase: SupabaseClient): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  const pageSize = 1000;
+  let from = 0;
+
+  for (;;) {
+    const { data, error } = await supabase
+      .from("event_djs")
+      .select("dj_id")
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      throw new Error(`Failed to load event links: ${error.message}`);
+    }
+
+    const rows = data ?? [];
+    for (const row of rows) {
+      const id = typeof row.dj_id === "string" ? row.dj_id : "";
+      if (!id) {
+        continue;
+      }
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+
+    if (rows.length < pageSize) {
+      break;
+    }
+    from += pageSize;
+  }
+
+  return counts;
+}
+
 async function fetchDjs(
   supabase: SupabaseClient,
   options: SearchEnrichDjsOptions
@@ -305,18 +375,15 @@ async function fetchDjs(
     throw new Error(`Failed to fetch DJs: ${error.message}`);
   }
 
-  let djs = ((data ?? []) as Record<string, unknown>[]).map(toDj);
+  const djs = ((data ?? []) as Record<string, unknown>[]).map(toDj);
   const found = new Set(djs.map((dj) => dj.slug));
   const missingSlugs = slugs.filter((slug) => !found.has(slug));
+  const eventCounts = options.linked ? await loadEventCounts(supabase) : new Map<string, number>();
 
-  if (options.onlyEmpty) {
-    djs = djs.filter(hasEmptyTarget);
-  }
-  if (options.limit != null) {
-    djs = djs.slice(0, options.limit);
-  }
-
-  return { djs, missingSlugs };
+  return {
+    djs: selectDjsForEnrichment(djs, eventCounts, options),
+    missingSlugs,
+  };
 }
 
 function renderReport(report: SearchEnrichReport): string {

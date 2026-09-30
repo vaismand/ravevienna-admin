@@ -1,6 +1,13 @@
-import { countriesMatch } from "./countryNames.ts";
+import {
+  concreteLocation,
+  countriesMatch,
+  countryTier,
+  isViennaCity,
+  isVaguePlaceName,
+} from "./countryNames.ts";
 import {
   decideDjCandidates,
+  REVIEW_MIN_SCORE,
   scoreDjCandidate,
   type CandidateDecision,
   type DjProfileCandidate,
@@ -131,29 +138,45 @@ function profilesLinked(
   );
 }
 
-function selectRaCompanion(
-  soundcloud: DjProfileCandidate,
-  raRanked: ScoredDjCandidate[]
-): DjProfileCandidate | null {
-  const linked = raRanked.filter((item) => profilesLinked(soundcloud, item.candidate));
-  if (linked.length === 1) {
-    return linked[0]!.candidate;
-  }
-  if (linked.length > 1) {
-    return linked[0]!.candidate;
-  }
+function asReview(decision: CandidateDecision): CandidateDecision {
+  const review = decision.ranked
+    .filter((item) => item.nameTier !== "none" || item.score >= REVIEW_MIN_SCORE)
+    .slice(0, 3);
 
-  const samePlace = raRanked.filter(
-    (item) =>
-      djSearchNamesMatch(soundcloud.name, item.candidate.name) &&
-      countriesMatch(soundcloud.country, item.candidate.country) &&
-      !countriesConflict(soundcloud, item.candidate)
+  return {
+    ...decision,
+    status: review.length > 0 ? "review" : "none",
+    chosen: null,
+    review,
+  };
+}
+
+function realAustriaOrVienna(candidate: DjProfileCandidate): boolean {
+  if (candidate.playsVienna) {
+    return true;
+  }
+  if (isVaguePlaceName(candidate.city)) {
+    return false;
+  }
+  const place = concreteLocation(candidate.city, candidate.country);
+  return countryTier(place.country, place.city) === "austria" || isViennaCity(place.city);
+}
+
+function agreesWithSoundcloud(
+  raCandidate: DjProfileCandidate,
+  soundcloud: CandidateDecision
+): boolean {
+  const chosen = soundcloud.chosen?.candidate;
+  if (soundcloud.status !== "auto" || !chosen) {
+    return false;
+  }
+  if (profilesLinked(chosen, raCandidate)) {
+    return true;
+  }
+  return (
+    djSearchNamesMatch(chosen.name, raCandidate.name) &&
+    !countriesConflict(chosen, raCandidate)
   );
-  if (samePlace.length === 1) {
-    return samePlace[0]!.candidate;
-  }
-
-  return null;
 }
 
 export function matchDjProfiles(input: {
@@ -176,28 +199,33 @@ export function matchDjProfiles(input: {
   let raPick: DjProfileCandidate | null = null;
   let raMerge: ProfileMatchOutcome["raMerge"] = "not_used";
 
+  let raDecision = ra;
+
   if (soundcloud.status === "auto" && soundcloud.chosen) {
     soundcloudPick = soundcloud.chosen.candidate;
-    if (ra.status === "auto" && ra.chosen) {
+    if (raDecision.status === "auto" && raDecision.chosen) {
+      const raCandidate = raDecision.chosen.candidate;
       if (
-        countriesConflict(soundcloudPick, ra.chosen.candidate) &&
-        !profilesLinked(soundcloudPick, ra.chosen.candidate)
+        countriesConflict(soundcloudPick, raCandidate) &&
+        !profilesLinked(soundcloudPick, raCandidate)
       ) {
         raMerge = "skipped_conflict";
+        raDecision = asReview(raDecision);
+      } else if (agreesWithSoundcloud(raCandidate, soundcloud)) {
+        raPick = raCandidate;
+        raMerge = "applied";
       } else {
-        raPick = ra.chosen.candidate;
-        raMerge = "applied";
-      }
-    } else {
-      const companion = selectRaCompanion(soundcloudPick, ra.ranked);
-      if (companion) {
-        raPick = companion;
-        raMerge = "applied";
+        raDecision = asReview(raDecision);
       }
     }
-  } else if (ra.status === "auto" && ra.chosen) {
-    raPick = ra.chosen.candidate;
-    raMerge = "applied";
+  } else if (raDecision.status === "auto" && raDecision.chosen) {
+    const raCandidate = raDecision.chosen.candidate;
+    if (realAustriaOrVienna(raCandidate)) {
+      raPick = raCandidate;
+      raMerge = "applied";
+    } else {
+      raDecision = asReview(raDecision);
+    }
   }
 
   const plan = planDjFieldUpdates({
@@ -211,7 +239,7 @@ export function matchDjProfiles(input: {
   return {
     ...plan,
     soundcloud,
-    ra,
+    ra: raDecision,
     raMerge,
   };
 }

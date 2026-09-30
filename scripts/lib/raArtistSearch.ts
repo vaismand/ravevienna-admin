@@ -1,4 +1,9 @@
-import { isViennaCity, normalizeCountryName } from "./countryNames.ts";
+import {
+  concreteLocation,
+  isViennaCity,
+  isVaguePlaceName,
+  normalizeCountryName,
+} from "./countryNames.ts";
 import { nameMatchTier } from "./djCandidateScore.ts";
 import { truncateToSentenceLimit } from "./parseSoundCloudProfile.ts";
 import { RequestPacer, ResponseCache } from "./responseCache.ts";
@@ -7,8 +12,6 @@ const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
 const ENDPOINT = "https://ra.co/graphql";
-
-const VAGUE_AREA = /^(north|south|east|west|midlands|central)$/i;
 
 const SEARCH_QUERY = `query SearchArtists($searchTerm: String, $limit: Int, $indices: [IndexType!]) {
   search(searchTerm: $searchTerm, limit: $limit, indices: $indices) {
@@ -180,14 +183,17 @@ export function parseRaSearchPayload(payload: unknown): RaArtistHit[] {
       continue;
     }
     const areaName = asString(record.areaName);
+    const place = concreteLocation(
+      areaName,
+      normalizeCountryName(asString(record.countryName)) ??
+        normalizeCountryName(asString(record.countryCode))
+    );
     artists.push({
       id,
       name,
       profileUrl,
-      city: areaName && !VAGUE_AREA.test(areaName) ? areaName : null,
-      country:
-        normalizeCountryName(asString(record.countryName)) ??
-        normalizeCountryName(asString(record.countryCode)),
+      city: place.city,
+      country: place.country,
       followers: null,
       bio: null,
       imageUrl: asString(record.imageUrl),
@@ -198,10 +204,8 @@ export function parseRaSearchPayload(payload: unknown): RaArtistHit[] {
       twitter: null,
       bandcamp: null,
       discogs: null,
-      playsVienna: isViennaCity(areaName),
-      playsAustria:
-        normalizeCountryName(asString(record.countryName)) === "Austria" ||
-        isViennaCity(areaName),
+      playsVienna: isViennaCity(place.city),
+      playsAustria: place.country === "Austria" || isViennaCity(place.city),
       playsNeighbour: false,
     });
   }
@@ -218,14 +222,20 @@ export function applyRaArtistDetail(hit: RaArtistHit, payload: unknown): RaArtis
   const biography = asRecord(artist.biography);
   const bio =
     plainText(asString(biography?.blurb)) ?? plainText(asString(biography?.content));
-  const country =
+  const area = asRecord(artist.area);
+  const areaName = asString(area?.name);
+  const resolvedCountry =
     countryFromRef(artist.country) ??
     countryFromRef(artist.residentCountry) ??
     hit.country;
-  const area = asRecord(artist.area);
-  const areaName = asString(area?.name);
-  const city =
-    areaName && !VAGUE_AREA.test(areaName) && areaName !== country ? areaName : hit.city;
+  const place = isVaguePlaceName(areaName)
+    ? { city: null, country: null }
+    : concreteLocation(
+        areaName && areaName !== resolvedCountry ? areaName : hit.city,
+        resolvedCountry
+      );
+  const city = place.city;
+  const country = place.country;
 
   const areas: Array<{ name: string | null; country: string | null }> = [];
   for (const key of ["regionsMostPlayed", "venuesMostPlayed"] as const) {

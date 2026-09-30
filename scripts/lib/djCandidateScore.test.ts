@@ -229,21 +229,82 @@ describe("scoreDjCandidate", () => {
     assert.equal(decision.review[0]?.candidate.city, "Graz");
   });
 
-  it("does not auto-pick a partial name without a profile link", () => {
+  it("does not auto-pick a partial or containment name, even with a profile link", () => {
     const decision = decideDjCandidates([
       scoreDjCandidate(
-        "Stimming",
+        "Jukebox",
         candidate({
-          name: "Stimming Official Archive",
-          country: "Austria",
-          profileUrl: "https://soundcloud.com/stimming-archive",
-          soundcloudUrl: "https://soundcloud.com/stimming-archive",
-        })
+          name: "Pandora's Jukebox",
+          username: "pandoras-jukebox",
+          country: "United Kingdom",
+          city: "London",
+          followers: 8000,
+          genres: ["house"],
+          profileUrl: "https://soundcloud.com/pandoras-jukebox",
+          soundcloudUrl: "https://soundcloud.com/pandoras-jukebox",
+        }),
+        {
+          eventLink: true,
+          crossSoundcloud: true,
+          crossInstagram: false,
+          crossCountry: false,
+        }
       ),
     ]);
 
     assert.equal(decision.status, "review");
     assert.equal(decision.review[0]?.nameTier, "partial");
+    assert.equal(decision.chosen, null);
+  });
+
+  it("keeps a 10-point lead in review when another named candidate exists", () => {
+    const best = scoreDjCandidate(
+      "Aras",
+      candidate({
+        name: "Aras",
+        country: "Czechia",
+        city: "Prague",
+        followers: 1,
+        source: "ra",
+        profileUrl: "https://ra.co/dj/aras",
+        soundcloudUrl: null,
+      })
+    );
+    const runnerUp = scoreDjCandidate(
+      "Aras",
+      candidate({
+        name: "Aras",
+        country: "Germany",
+        city: "Berlin",
+        followers: 1,
+        source: "ra",
+        profileUrl: "https://ra.co/dj/aras-berlin",
+        soundcloudUrl: null,
+      })
+    );
+    runnerUp.score = best.score - 10;
+
+    const decision = decideDjCandidates([best, runnerUp]);
+    assert.equal(decision.status, "review");
+    assert.equal(decision.margin, 10);
+  });
+
+  it("treats a placeholder area such as All, Slovenia as an unknown location", () => {
+    const scored = scoreDjCandidate(
+      "Comrade Martin",
+      candidate({
+        name: "Comrade Martin",
+        city: "All",
+        country: "Slovenia",
+        followers: 2,
+        source: "ra",
+        profileUrl: "https://ra.co/dj/comrademartin",
+        soundcloudUrl: null,
+      })
+    );
+
+    assert.equal(scored.reasons.includes("location_neighbour"), false);
+    assert.equal(scored.reasons.includes("location_distant"), false);
   });
 });
 
@@ -324,6 +385,27 @@ describe("planDjFieldUpdates", () => {
     assert.ok(plan.skippedMissingColumn.includes("ra_slug"));
     assert.equal(plan.updates.ra_url, undefined);
     assert.equal(plan.updates.soundcloud_url, "https://soundcloud.com/stimming");
+  });
+
+  it("does not write a country from a placeholder RA area", () => {
+    const plan = planDjFieldUpdates({
+      dj: emptyDj({ name: "Comrade Martin", slug: "comrade-martin" }),
+      soundcloud: null,
+      ra: candidate({
+        source: "ra",
+        name: "Comrade Martin",
+        city: "All",
+        country: "Slovenia",
+        followers: 2,
+        profileUrl: "https://ra.co/dj/comrademartin",
+        soundcloudUrl: null,
+      }),
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(plan.updates.country, undefined);
+    assert.equal(plan.updates.city, undefined);
   });
 });
 
@@ -408,5 +490,107 @@ describe("matchDjProfiles", () => {
     assert.equal(ambiguous.soundcloud.status, "review");
     assert.equal(ambiguous.soundcloud.review.length, 2);
     assert.deepEqual(ambiguous.updates, {});
+  });
+
+  it("does not merge a review-only RA profile into an auto SoundCloud match", () => {
+    const result = matchDjProfiles({
+      dj: emptyDj({ name: "Jukebox", slug: "jukebox" }),
+      soundcloud: [
+        candidate({
+          name: "Jukebox",
+          country: "Austria",
+          city: "Vienna",
+          followers: 400,
+          genres: ["techno"],
+          profileUrl: "https://soundcloud.com/jukebox-vienna",
+          soundcloudUrl: "https://soundcloud.com/jukebox-vienna",
+        }),
+      ],
+      ra: [
+        candidate({
+          source: "ra",
+          name: "Pandora's Jukebox",
+          username: "pandorasjukebox-uk",
+          country: "United Kingdom",
+          city: "London",
+          followers: 20,
+          websiteUrl: "https://pandoras.example",
+          profileUrl: "https://ra.co/dj/pandorasjukebox-uk",
+          soundcloudUrl: "https://soundcloud.com/pandoras-jukebox",
+        }),
+      ],
+      evidence: { soundcloudUrls: [], instagramUrls: [] },
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(result.soundcloud.status, "auto");
+    assert.equal(result.ra.status, "review");
+    assert.equal(result.raMerge, "not_used");
+    assert.equal(result.updates.country, "Austria");
+    assert.equal(result.updates.website_url, undefined);
+    assert.equal(result.updates.soundcloud_url, "https://soundcloud.com/jukebox-vienna");
+  });
+
+  it("does not apply an RA-only match outside Austria when SoundCloud stays in review", () => {
+    const result = matchDjProfiles({
+      dj: emptyDj({ name: "Aras", slug: "aras" }),
+      soundcloud: [
+        candidate({
+          name: "Aras Archive",
+          country: null,
+          followers: 10,
+          profileUrl: "https://soundcloud.com/aras-archive",
+          soundcloudUrl: "https://soundcloud.com/aras-archive",
+        }),
+      ],
+      ra: [
+        candidate({
+          source: "ra",
+          name: "Aras",
+          country: "Czechia",
+          city: "Prague",
+          followers: 1,
+          genres: ["techno"],
+          profileUrl: "https://ra.co/dj/aras",
+          soundcloudUrl: null,
+        }),
+      ],
+      evidence: { soundcloudUrls: [], instagramUrls: [] },
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(result.ra.status, "review");
+    assert.equal(result.raMerge, "not_used");
+    assert.equal(result.updates.country, undefined);
+    assert.deepEqual(result.updates, {});
+  });
+
+  it("still auto-applies an RA-only profile located in Vienna", () => {
+    const result = matchDjProfiles({
+      dj: emptyDj({ name: "Stimming", slug: "stimming" }),
+      soundcloud: [],
+      ra: [
+        candidate({
+          source: "ra",
+          name: "Stimming",
+          country: "Austria",
+          city: "Vienna",
+          followers: 300,
+          bio: "Vienna techno.",
+          profileUrl: "https://ra.co/dj/stimming",
+          soundcloudUrl: "https://soundcloud.com/stimming",
+        }),
+      ],
+      evidence: { soundcloudUrls: [], instagramUrls: [] },
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(result.ra.status, "auto");
+    assert.equal(result.raMerge, "applied");
+    assert.equal(result.updates.country, "Austria");
+    assert.equal(result.soundcloud.status, "none");
   });
 });

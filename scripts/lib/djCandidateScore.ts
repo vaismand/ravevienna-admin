@@ -1,4 +1,4 @@
-import { countryTier, isViennaCity } from "./countryNames.ts";
+import { concreteLocation, countryTier, isViennaCity } from "./countryNames.ts";
 import {
   compactDjSearchName,
   normalizeDjSearchName,
@@ -151,12 +151,12 @@ export function followerPoints(count: number | null | undefined): number {
 function locationPoints(
   candidate: DjProfileCandidate
 ): { points: number; reasons: string[] } {
-  const tier = countryTier(candidate.country, candidate.city);
+  const place = concreteLocation(candidate.city, candidate.country);
+  const tier = countryTier(place.country, place.city);
   const reasons: string[] = [];
   let points = 0;
 
-  const vienna =
-    isViennaCity(candidate.city) || candidate.playsVienna;
+  const vienna = isViennaCity(place.city) || candidate.playsVienna;
 
   if (tier === "austria") {
     points += 30;
@@ -275,15 +275,8 @@ export function scoreDjCandidate(
   };
 }
 
-function hasStrongEvidence(signals: MatchSignals): boolean {
-  return signals.eventLink || signals.crossSoundcloud;
-}
-
 function canAutoAccept(scored: ScoredDjCandidate): boolean {
-  if (scored.nameTier === "exact") {
-    return true;
-  }
-  return scored.nameTier === "partial" && hasStrongEvidence(scored.signals);
+  return scored.nameTier === "exact";
 }
 
 export function decideDjCandidates(
@@ -310,9 +303,7 @@ export function decideDjCandidates(
   }
 
   const margin = second ? best.score - second.score : null;
-  const runnerUpMeaningful = Boolean(
-    second && second.nameTier !== "none" && second.score >= REVIEW_MIN_SCORE
-  );
+  const runnerUpMeaningful = Boolean(second && second.nameTier !== "none");
 
   const eligible = canAutoAccept(best);
   const clearMargin =

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { applyRaArtistDetail, parseRaSearchPayload } from "./raArtistSearch.ts";
+import { selectDjsForEnrichment } from "./searchEnrichDjs.ts";
+import type { DjEnrichmentRow } from "./djFieldPlan.ts";
 import {
   extractSoundCloudAssetUrls,
   extractSoundCloudClientId,
@@ -91,5 +93,76 @@ describe("RA artist search parsing", () => {
     assert.equal(detailed.playsVienna, true);
     assert.equal(detailed.playsAustria, true);
     assert.match(detailed.bio ?? "", /Techno producer/);
+  });
+
+  it("treats an All area as an unknown location", () => {
+    const hits = parseRaSearchPayload({
+      data: {
+        search: [
+          {
+            id: "1",
+            value: "Comrade Martin",
+            areaName: "All",
+            countryName: "Slovenia",
+            countryCode: "SI",
+            contentUrl: "/dj/comrademartin",
+            imageUrl: null,
+          },
+        ],
+      },
+    });
+
+    assert.equal(hits[0]?.city, null);
+    assert.equal(hits[0]?.country, null);
+  });
+});
+
+function djRow(
+  id: string,
+  name: string,
+  active: boolean
+): DjEnrichmentRow {
+  const row = {
+    id,
+    name,
+    slug: name.toLowerCase(),
+    bio: null,
+    genres: [] as string[],
+    instagram_url: null,
+    soundcloud_url: null,
+    spotify_url: null,
+    website_url: null,
+    image_url: null,
+    city: null,
+    country: null,
+    is_active: active,
+  };
+  return { ...row, raw: row };
+}
+
+describe("selectDjsForEnrichment", () => {
+  it("keeps active DJs that are linked to events, highest count first", () => {
+    const djs = [
+      djRow("a", "Ada", true),
+      djRow("b", "Bea", false),
+      djRow("c", "Cid", true),
+      djRow("d", "Dee", true),
+    ];
+    const counts = new Map([
+      ["a", 1],
+      ["b", 9],
+      ["c", 4],
+    ]);
+
+    const selected = selectDjsForEnrichment(djs, counts, {
+      active: true,
+      linked: true,
+      limit: 20,
+    });
+
+    assert.deepEqual(
+      selected.map((dj) => dj.id),
+      ["c", "a"]
+    );
   });
 });

@@ -5,6 +5,7 @@
  *
  *   npm run search:enrich:djs
  *   npm run search:enrich:djs -- --dry-run --limit 10
+ *   npm run search:enrich:djs -- --dry-run --active --linked --limit 20
  *   npm run search:enrich:djs -- --slug stimming --only-empty
  *   npm run search:enrich:djs -- --write --slug stimming
  *   npm run search:enrich:djs -- --write --force --slug stimming
@@ -23,6 +24,8 @@ type CliOptions = {
   slugs: string[];
   limit: number | null;
   onlyEmpty: boolean;
+  active: boolean;
+  linked: boolean;
   dryRun: boolean;
   force: boolean;
 };
@@ -33,6 +36,8 @@ function parseArgs(argv: string[]): CliOptions {
     slugs: [],
     limit: null,
     onlyEmpty: false,
+    active: false,
+    linked: false,
     dryRun: true,
     force: false,
   };
@@ -49,6 +54,10 @@ function parseArgs(argv: string[]): CliOptions {
       write = true;
     } else if (arg === "--only-empty") {
       options.onlyEmpty = true;
+    } else if (arg === "--active") {
+      options.active = true;
+    } else if (arg === "--linked") {
+      options.linked = true;
     } else if (arg === "--force") {
       options.force = true;
     } else if (arg === "--limit") {
@@ -86,6 +95,7 @@ function printHelp() {
 Usage:
   npm run search:enrich:djs
   npm run search:enrich:djs -- --dry-run --limit 10
+  npm run search:enrich:djs -- --dry-run --active --linked --limit 20
   npm run search:enrich:djs -- --only-empty --slug some-dj
   npm run search:enrich:djs -- --write --slug some-dj
   npm run search:enrich:djs -- --write --force --slug some-dj
@@ -93,6 +103,8 @@ Usage:
 --dry-run     Preview only (default). Writes scripts/output/dj-search-enrich.json and .md
 --write       Apply auto-confident matches. Review rows are never written.
 --limit N     Process at most N DJs
+--active      Only DJs with is_active = true
+--linked      Only DJs linked to events, highest event count first
 --only-empty  Skip DJs that already have bio, image, country, city, genres, and links
 --slug        Only this slug. Repeat the flag to pass several.
 --force       Overwrite non-empty fields on auto-confident matches
@@ -113,6 +125,8 @@ export async function runSearchEnrichDjs(
     slugs: options.slugs,
     limit: options.limit,
     onlyEmpty: options.onlyEmpty,
+    active: options.active,
+    linked: options.linked,
     dryRun: options.dryRun,
     force: options.force,
     outputDir,

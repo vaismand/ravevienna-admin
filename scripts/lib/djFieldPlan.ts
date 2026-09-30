@@ -1,5 +1,5 @@
 import type { DjProfileCandidate } from "./djCandidateScore.ts";
-import { normalizeCountryName } from "./countryNames.ts";
+import { concreteLocation, normalizeCountryName } from "./countryNames.ts";
 import { canonicalInstagramUrl, canonicalSoundCloudUrl } from "./profileLinks.ts";
 import { normalizeSpotifyGenres } from "./normalizeSpotifyGenres.ts";
 
@@ -100,13 +100,17 @@ export function planDjFieldUpdates(input: {
     proposed.set("bio", bio);
   }
 
-  const city = cleanText(soundcloud?.city, 120);
+  const soundcloudPlace = concreteLocation(soundcloud?.city, soundcloud?.country);
+  const raPlace = concreteLocation(ra?.city, ra?.country);
+
+  const city = cleanText(soundcloudPlace.city, 120);
   if (city) {
     proposed.set("city", city);
   }
 
   const country =
-    normalizeCountryName(soundcloud?.country) ?? normalizeCountryName(ra?.country);
+    normalizeCountryName(soundcloudPlace.country) ??
+    normalizeCountryName(raPlace.country);
   if (country) {
     proposed.set("country", country);
   }

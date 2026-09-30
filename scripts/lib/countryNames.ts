@@ -129,8 +129,41 @@ export function normalizeCountryName(
 
 export type CountryTier = "austria" | "neighbour" | "other" | "unknown";
 
+const VAGUE_PLACE =
+  /^(?:all|various|unknown|n\/?a|worldwide|global|other|anywhere|none|tbd|tba|multiple|international|north|south|east|west|midlands|central)$/i;
+
+/** Placeholder areas such as "All" or "All, Slovenia" are not a real location. */
+export function isVaguePlaceName(value: string | null | undefined): boolean {
+  if (!value?.trim()) {
+    return false;
+  }
+  const trimmed = value.trim();
+  if (VAGUE_PLACE.test(trimmed)) {
+    return true;
+  }
+  const first = trimmed.split(/\s*[,|/–—-]\s*/)[0]?.trim() ?? "";
+  return Boolean(first && first !== trimmed && VAGUE_PLACE.test(first));
+}
+
+/**
+ * Drop placeholder areas. "All, Slovenia" becomes an unknown location so it
+ * cannot score as Slovenia or be written into `djs.country`.
+ */
+export function concreteLocation(
+  city: string | null | undefined,
+  country: string | null | undefined
+): { city: string | null; country: string | null } {
+  if (isVaguePlaceName(city)) {
+    return { city: null, country: null };
+  }
+  return {
+    city: city?.trim() || null,
+    country: isVaguePlaceName(country) ? null : country?.trim() || null,
+  };
+}
+
 export function isViennaCity(city: string | null | undefined): boolean {
-  if (!city?.trim()) {
+  if (!city?.trim() || isVaguePlaceName(city)) {
     return false;
   }
   return /\b(vienna|wien)\b/i.test(city);
