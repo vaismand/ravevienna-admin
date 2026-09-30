@@ -1,7 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { loadScriptEnv } from "../scripts/lib/loadEnv.ts";
-import { normalizeEventGenres } from "../scripts/lib/genres.ts";
+import { publishDraftRecord } from "../src/lib/publishDraft.ts";
+import type { DraftEvent } from "../src/types/database.ts";
 
 loadScriptEnv();
 
@@ -27,60 +28,29 @@ async function main() {
     return;
   }
 
-  const rows = drafts.map((draft) => ({
-    title: draft.title,
+  const failed: string[] = [];
+  let published = 0;
 
-    venue_id: draft.venue_id,
-
-    event_date: draft.event_date,
-    start_time: draft.start_time,
-
-    price: draft.price,
-    genres: normalizeEventGenres(draft.genres ?? []),
-
-    description: draft.description,
-    lineup: Array.isArray(draft.lineup) ? draft.lineup : [],
-    ticket_url: draft.ticket_url,
-    image_url: draft.image_url,
-
-    source_id: draft.source_id,
-    draft_event_id: draft.id,
-    external_id: draft.external_id,
-    external_url: draft.external_url,
-  }));
-
-  const { data: insertedEvents, error: upsertError } = await supabase
-    .from("events")
-    .upsert(rows, {
-      onConflict: "source_id,external_id",
-    })
-    .select("id, title");
-
-  if (upsertError) {
-    console.error("Could not publish events:", upsertError);
-    process.exit(1);
+  for (const draft of drafts as DraftEvent[]) {
+    try {
+      const { eventId, djs } = await publishDraftRecord(supabase, draft);
+      published += 1;
+      const created =
+        djs.created.length > 0 ? ` (new DJs: ${djs.created.join(", ")})` : "";
+      console.log(`- ${draft.title} [${eventId}]${created}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      failed.push(`${draft.title}: ${message}`);
+      console.error(`Failed to publish ${draft.title}: ${message}`);
+    }
   }
 
-  const publishedDraftIds = drafts.map((draft) => draft.id);
+  console.log(`Published ${published} event(s).`);
 
-  const { error: updateDraftsError } = await supabase
-    .from("draft_events")
-    .update({
-      status: "published",
-      updated_at: new Date().toISOString(),
-    })
-    .in("id", publishedDraftIds);
-
-  if (updateDraftsError) {
-    console.error("Events were inserted, but draft status update failed:");
-    console.error(updateDraftsError);
+  if (failed.length > 0) {
+    console.error(`${failed.length} event(s) failed.`);
     process.exit(1);
   }
-
-  console.log(`Published ${insertedEvents?.length ?? 0} events:`);
-  insertedEvents?.forEach((event) => {
-    console.log(`- ${event.title}`);
-  });
 }
 
 main().catch((error) => {

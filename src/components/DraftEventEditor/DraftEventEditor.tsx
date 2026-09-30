@@ -38,7 +38,7 @@ interface DraftEventEditorProps {
   onApprove: (data: DraftEventFormData) => Promise<void>;
   onReject: () => Promise<void>;
   onPending: () => Promise<void>;
-  onPublish: (data: DraftEventFormData, djIds: string[]) => Promise<void>;
+  onPublish: (data: DraftEventFormData) => Promise<void>;
 }
 
 export function DraftEventEditor({
@@ -101,8 +101,9 @@ export function DraftEventEditor({
           />
           {!hasPublishedEvent && event.source_id && event.external_id && (
             <p className={styles.djNote}>
-              DJ links are stored when you publish (or after the event exists in
-              the feed). Selection is kept when you publish from this dialog.
+              Publish links each lineup name to a DJ, in that order, and creates
+              any missing DJs. Save changes stores this directory selection once
+              the event is already in the feed.
             </p>
           )}
         </div>
@@ -146,7 +147,7 @@ export function DraftEventEditor({
             <button
               type="button"
               className={styles.publishBtn}
-              onClick={() => void onPublish(form, selectedDjIds)}
+              onClick={() => void onPublish(form)}
               disabled={busy}
             >
               Publish

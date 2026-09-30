@@ -1,12 +1,13 @@
 import { supabase } from './supabase';
+import { mergeLineupDjResults } from './draftApproveMessages';
 import {
   ensureDjsFromDraftLineups,
   ensureDjsFromLineup,
-  ensureDjsFromLineupSources,
   type EnsureLineupDjsResult,
   type LineupDjContext,
 } from './ensureLineupDjs';
 import { parseLineupText } from './lineup';
+import { publishDraftRecord } from './publishDraft';
 import { formatPostgrestError } from './supabaseErrors';
 import type {
   DraftEvent,
@@ -20,31 +21,6 @@ function parsePrice(value: string): number | null {
   const normalized = trimmed.replace(/[^\d.,-]/g, '').replace(',', '.');
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
-}
-
-function normalizePrice(price: number | string | null | undefined): number | null {
-  if (price === null || price === undefined) return null;
-  if (typeof price === 'number') return price;
-  return parsePrice(String(price));
-}
-
-/** Payload aligned with public.events (same shape as draft_events, no status/raw_data). */
-function buildPublishedEventPayload(draft: DraftEvent) {
-  return {
-    source_id: draft.source_id!,
-    venue_id: draft.venue_id,
-    title: draft.title,
-    event_date: draft.event_date,
-    start_time: draft.start_time,
-    price: normalizePrice(draft.price),
-    genres: draft.genres ?? [],
-    description: draft.description,
-    lineup: draft.lineup ?? [],
-    ticket_url: draft.ticket_url,
-    image_url: draft.image_url,
-    external_url: draft.external_url,
-    external_id: draft.external_id!,
-  };
 }
 
 export function formDataToUpdatePayload(data: DraftEventFormData) {
@@ -141,72 +117,11 @@ export async function updateDraftStatus(
   return ensureDjsFromDraftLineups([id]);
 }
 
-/**
- * Publish draft → events using select-then-insert/update (works without upsert constraint).
- * Matches draft_events columns only (no draft_event_id — add column + field if needed).
- */
+/** Publish one draft with the shared event, DJ, and event_djs writer. */
 export async function publishDraftEvent(
   draft: DraftEvent,
-  options?: { skipLineupDjs?: boolean },
-): Promise<{ eventId: string; djs: EnsureLineupDjsResult | null }> {
-  if (!draft.source_id || !draft.external_id) {
-    throw new Error(
-      'Cannot publish: source_id and external_id are required.',
-    );
-  }
-
-  const payload = buildPublishedEventPayload(draft);
-
-  const { data: existing, error: findError } = await supabase
-    .from('events')
-    .select('id')
-    .eq('source_id', payload.source_id)
-    .eq('external_id', payload.external_id)
-    .maybeSingle();
-
-  if (findError) {
-    throw new Error(formatPostgrestError(findError));
-  }
-
-  let eventId: string;
-
-  if (existing?.id) {
-    const { error: updateError } = await supabase
-      .from('events')
-      .update(payload)
-      .eq('id', existing.id);
-
-    if (updateError) {
-      throw new Error(formatPostgrestError(updateError));
-    }
-    eventId = existing.id;
-  } else {
-    const { data: inserted, error: insertError } = await supabase
-      .from('events')
-      .insert(payload)
-      .select('id')
-      .single();
-
-    if (insertError) {
-      throw new Error(formatPostgrestError(insertError));
-    }
-    eventId = inserted.id as string;
-  }
-
-  const djs = options?.skipLineupDjs
-    ? null
-    : await ensureDjsFromLineup(draft.lineup ?? [], draft.genres);
-
-  const { error: statusError } = await supabase
-    .from('draft_events')
-    .update({ status: 'published', updated_at: new Date().toISOString() })
-    .eq('id', draft.id);
-
-  if (statusError) {
-    throw new Error(formatPostgrestError(statusError));
-  }
-
-  return { eventId, djs };
+): Promise<{ eventId: string; djs: EnsureLineupDjsResult }> {
+  return publishDraftRecord(supabase, draft);
 }
 
 export async function bulkUpdateStatus(
@@ -238,17 +153,12 @@ export async function bulkPublish(
 ): Promise<{ succeeded: number; failed: string[]; djs: EnsureLineupDjsResult }> {
   const failed: string[] = [];
   let succeeded = 0;
-
-  const djs = await ensureDjsFromLineupSources(
-    drafts.map((draft) => ({
-      lineup: draft.lineup ?? [],
-      eventGenres: draft.genres,
-    })),
-  );
+  const djResults: EnsureLineupDjsResult[] = [];
 
   for (const draft of drafts) {
     try {
-      await publishDraftEvent(draft, { skipLineupDjs: true });
+      const { djs } = await publishDraftEvent(draft);
+      djResults.push(djs);
       succeeded++;
     } catch (err) {
       failed.push(
@@ -260,6 +170,6 @@ export async function bulkPublish(
   return {
     succeeded,
     failed,
-    djs,
+    djs: mergeLineupDjResults(djResults),
   };
 }
