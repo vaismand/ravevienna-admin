@@ -1,10 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { slugFromName } from './djUtils';
+import { djNamesMatch, slugFromName } from './djUtils';
 import { formatPostgrestError } from './supabaseErrors';
 import {
   escapeIlikePattern,
   genresForNewLineupDj,
-  lineupNamesMatch,
   normalizeLineupArtistName,
   prepareLineupForDjImport,
 } from '../../scripts/lib/lineupArtists';
@@ -42,28 +41,23 @@ async function findDjIdBySlug(
   return data?.[0]?.id ?? null;
 }
 
-async function findDjIdByName(
+async function findDjIdByExactSlugAndName(
   client: SupabaseClient,
-  name: string,
+  slug: string,
+  normalizedName: string,
 ): Promise<string | null> {
-  const normalized = normalizeLineupArtistName(name);
-  if (!normalized) return null;
-
   const { data, error } = await client
     .from('djs')
     .select('id, name')
-    .ilike('name', escapeIlikePattern(normalized))
-    .limit(10);
+    .eq('slug', slug)
+    .limit(1);
 
   if (error) throw new Error(formatPostgrestError(error));
 
-  for (const row of data ?? []) {
-    if (lineupNamesMatch(row.name ?? '', normalized)) {
-      return row.id as string;
-    }
-  }
-
-  return null;
+  const row = data?.[0];
+  if (!row?.id) return null;
+  if (!djNamesMatch(String(row.name ?? ''), normalizedName)) return null;
+  return row.id as string;
 }
 
 async function findDjIdBySlugFamily(
@@ -80,8 +74,37 @@ async function findDjIdBySlugFamily(
   if (error) throw new Error(formatPostgrestError(error));
 
   for (const row of data ?? []) {
-    if (lineupNamesMatch(row.name ?? '', normalizedName)) {
+    if (djNamesMatch(row.name ?? '', normalizedName)) {
       return row.id as string;
+    }
+  }
+
+  return null;
+}
+
+async function findDjIdByFoldedName(
+  client: SupabaseClient,
+  normalizedName: string,
+): Promise<string | null> {
+  const folded = slugFromName(normalizedName).replace(/-/g, ' ');
+  const patterns = [normalizedName];
+  if (folded && folded !== normalizedName.toLowerCase()) {
+    patterns.push(folded);
+  }
+
+  for (const pattern of patterns) {
+    const { data, error } = await client
+      .from('djs')
+      .select('id, name')
+      .ilike('name', escapeIlikePattern(pattern))
+      .limit(10);
+
+    if (error) throw new Error(formatPostgrestError(error));
+
+    for (const row of data ?? []) {
+      if (djNamesMatch(row.name ?? '', normalizedName)) {
+        return row.id as string;
+      }
     }
   }
 
@@ -97,7 +120,11 @@ export async function findDjIdForLineupName(
 
   const baseSlug = slugFromName(normalized);
   if (baseSlug) {
-    const byExactSlug = await findDjIdBySlug(client, baseSlug);
+    const byExactSlug = await findDjIdByExactSlugAndName(
+      client,
+      baseSlug,
+      normalized,
+    );
     if (byExactSlug) return byExactSlug;
 
     const bySlugFamily = await findDjIdBySlugFamily(
@@ -108,7 +135,7 @@ export async function findDjIdForLineupName(
     if (bySlugFamily) return bySlugFamily;
   }
 
-  return findDjIdByName(client, normalized);
+  return findDjIdByFoldedName(client, normalized);
 }
 
 async function ensureUniqueSlug(
@@ -144,7 +171,7 @@ export async function ensureDjsFromLineupSources(
     const genres = genresForNewLineupDj(source.eventGenres);
 
     for (const name of names) {
-      const dedupeKey = name.toLowerCase();
+      const dedupeKey = slugFromName(name) || name.toLowerCase();
       if (resolvedNames.has(dedupeKey)) {
         existing.push(name);
         continue;
@@ -228,7 +255,8 @@ export async function ensureDjsFromDraftLineups(
 }
 
 /**
- * DJ ids for each lineup entry, in lineup order.
+ * DJ ids for the same names `ensureDjsFromLineup` creates, in that order.
+ * Floor labels are dropped and b2b / f2f / vs / & sets are split first.
  * The same DJ is linked once; names that do not resolve are skipped.
  */
 export async function resolveLineupDjIds(
@@ -238,10 +266,7 @@ export async function resolveLineupDjIds(
   const ids: string[] = [];
   const seen = new Set<string>();
 
-  for (const raw of lineup) {
-    const name = normalizeLineupArtistName(raw);
-    if (!name) continue;
-
+  for (const name of prepareLineupForDjImport(lineup)) {
     const id = await findDjIdForLineupName(client, name);
     if (!id || seen.has(id)) continue;
 

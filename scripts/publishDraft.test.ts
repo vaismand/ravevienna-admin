@@ -2,12 +2,15 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { slugFromName } from "../src/lib/djUtils.ts";
+import { ensureDjsFromDraftLineups } from "../src/lib/lineupDjEnsure.ts";
 import {
   genresJsonToTextArray,
   lineupToTextArray,
   normalizeEventPrice,
   publishDraftRecord,
 } from "../src/lib/publishDraft.ts";
+import { prepareLineupForDjImport } from "./lib/lineupArtists.ts";
 import type { DraftEvent } from "../src/types/database.ts";
 
 type Row = Record<string, unknown>;
@@ -15,7 +18,8 @@ type Row = Record<string, unknown>;
 type Filter =
   | { op: "eq"; column: string; value: unknown }
   | { op: "ilike"; column: string; pattern: string }
-  | { op: "or"; raw: string };
+  | { op: "or"; raw: string }
+  | { op: "in"; column: string; values: unknown[] };
 
 function unescapeLike(pattern: string): string {
   return pattern.replace(/\\([%_\\])/g, "$1");
@@ -101,7 +105,8 @@ class Query {
     return this;
   }
 
-  in(): this {
+  in(column: string, values: unknown[]): this {
+    this.filters.push({ op: "in", column, values });
     return this;
   }
 
@@ -138,7 +143,11 @@ class Query {
       if (filter.op === "ilike") {
         return ilikeEquals(String(row[filter.column] ?? ""), filter.pattern);
       }
-      return matchOr(row, filter.raw);
+      if (filter.op === "in") {
+        return filter.values.some((value) => value === row[filter.column]);
+      }
+      if (filter.op === "or") return matchOr(row, filter.raw);
+      return false;
     });
   }
 
@@ -235,6 +244,11 @@ function draft(overrides: Partial<DraftEvent> = {}): DraftEvent {
 
 function rows(db: Map<string, Row[]>, table: string): Row[] {
   return db.get(table) ?? [];
+}
+
+function linkedNames(db: Map<string, Row[]>): string[] {
+  const nameById = new Map(rows(db, "djs").map((row) => [row.id, row.name]));
+  return rows(db, "event_djs").map((row) => String(nameById.get(row.dj_id)));
 }
 
 describe("publish payload conversion", () => {
@@ -355,5 +369,158 @@ describe("publishDraftRecord", () => {
     );
     assert.equal(rows(db, "events").length, 0);
     assert.equal(rows(db, "event_djs").length, 0);
+  });
+
+  it("links both DJs in a b2b set and skips floor labels", async () => {
+    const { db, client } = createDb();
+    db.set("draft_events", [{ id: "draft-1", status: "approved" }]);
+
+    await publishDraftRecord(
+      client,
+      draft({
+        lineup: [
+          "[MAINFLOOR]",
+          "Annakonda B2B Stendhal Syndrome",
+          "KITCHEN Hosted By Bassbussi",
+        ],
+      }),
+    );
+
+    assert.deepEqual(
+      rows(db, "djs").map((row) => row.name),
+      ["Annakonda", "Stendhal Syndrome"],
+    );
+    assert.deepEqual(linkedNames(db), ["Annakonda", "Stendhal Syndrome"]);
+  });
+
+  it("keeps existing event_djs when the lineup resolves no DJs", async () => {
+    const { db, client } = createDb();
+    db.set("draft_events", [{ id: "draft-1", status: "approved" }]);
+    const source = draft({ lineup: ["Alice"] });
+
+    await publishDraftRecord(client, source);
+    const kept = rows(db, "event_djs").map((row) => row.id);
+
+    await publishDraftRecord(client, {
+      ...source,
+      lineup: ["[MAINFLOOR]"],
+    });
+
+    assert.deepEqual(
+      rows(db, "event_djs").map((row) => row.id),
+      kept,
+    );
+    assert.deepEqual(linkedNames(db), ["Alice"]);
+  });
+
+  it("matches KØ:LAB to an existing kolab DJ", async () => {
+    const { db, client } = createDb();
+    db.set("draft_events", [{ id: "draft-1", status: "approved" }]);
+    db.set("djs", [{ id: "dj-kolab", name: "KOLAB", slug: "kolab" }]);
+
+    const result = await publishDraftRecord(
+      client,
+      draft({ lineup: ["KØ:LAB"] }),
+    );
+
+    assert.deepEqual(result.djs.created, []);
+    assert.equal(rows(db, "djs").length, 1);
+    assert.deepEqual(
+      rows(db, "event_djs").map((row) => row.dj_id),
+      ["dj-kolab"],
+    );
+  });
+
+  it("matches Amélie to an existing Amelie DJ", async () => {
+    const { db, client } = createDb();
+    db.set("draft_events", [{ id: "draft-1", status: "approved" }]);
+    db.set("djs", [{ id: "dj-amelie", name: "Amelie", slug: "amelie" }]);
+
+    const result = await publishDraftRecord(
+      client,
+      draft({ lineup: ["Amélie"] }),
+    );
+
+    assert.deepEqual(result.djs.created, []);
+    assert.equal(rows(db, "djs").length, 1);
+    assert.deepEqual(
+      rows(db, "event_djs").map((row) => row.dj_id),
+      ["dj-amelie"],
+    );
+  });
+
+  it("does not attach a name to a different DJ that owns the slug", async () => {
+    const { db, client } = createDb();
+    db.set("draft_events", [{ id: "draft-1", status: "approved" }]);
+    db.set("djs", [
+      { id: "dj-other", name: "Not Amelie", slug: "amelie" },
+      { id: "dj-amelie", name: "Amélie", slug: "amelie-2" },
+    ]);
+
+    const result = await publishDraftRecord(
+      client,
+      draft({ lineup: ["Amelie"] }),
+    );
+
+    assert.deepEqual(result.djs.created, []);
+    assert.equal(rows(db, "djs").length, 2);
+    assert.deepEqual(
+      rows(db, "event_djs").map((row) => row.dj_id),
+      ["dj-amelie"],
+    );
+  });
+});
+
+describe("lineup names and slugs", () => {
+  it("splits collaborations and drops floor labels", () => {
+    assert.deepEqual(
+      prepareLineupForDjImport([
+        "[MAINFLOOR]",
+        "Annakonda B2B Stendhal Syndrome",
+        "AKOV F2F MANTA",
+        "Left vs Right",
+        "Alpha & Beta",
+        "KITCHEN Hosted By Bassbussi",
+      ]),
+      [
+        "Annakonda",
+        "Stendhal Syndrome",
+        "AKOV",
+        "MANTA",
+        "Left",
+        "Right",
+        "Alpha",
+        "Beta",
+      ],
+    );
+  });
+
+  it("folds Ø, Æ, ß, and diacritics into the slug", () => {
+    assert.equal(slugFromName("KØ:LAB"), "kolab");
+    assert.equal(slugFromName("Kølab"), "kolab");
+    assert.equal(slugFromName("KOLAB"), "kolab");
+    assert.equal(slugFromName("Amélie"), "amelie");
+    assert.equal(slugFromName("Amelie"), "amelie");
+    assert.equal(slugFromName("Æon"), "aeon");
+    assert.equal(slugFromName("Straße"), "strasse");
+    assert.equal(slugFromName("Ø"), "o");
+  });
+});
+
+describe("in-memory client in()", () => {
+  it("imports DJs only from the requested draft ids", async () => {
+    const { db, client } = createDb();
+    db.set("draft_events", [
+      { id: "d1", lineup: ["Only One"], genres: ["Techno"] },
+      { id: "d2", lineup: ["Should Skip"], genres: ["House"] },
+    ]);
+
+    const result = await ensureDjsFromDraftLineups(client, ["d1"]);
+
+    assert.deepEqual(result.created, ["Only One"]);
+    assert.deepEqual(
+      rows(db, "djs").map((row) => row.name),
+      ["Only One"],
+    );
   });
 });

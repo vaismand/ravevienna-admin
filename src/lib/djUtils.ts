@@ -1,12 +1,27 @@
 import type { Dj, DjFormData } from '../types/database';
 
+/**
+ * Slug for a DJ name. Folds Ø→o, Æ→ae, ß→ss, and diacritics (é→e)
+ * so stylized names share a slug with their plain spelling (KØ:LAB → kolab).
+ */
 export function slugFromName(name: string): string {
-  return name
+  const folded = name
     .toLowerCase()
+    .replace(/ø/g, 'o')
+    .replace(/æ/g, 'ae')
+    .replace(/ß/g, 'ss')
+    .replace(/:/g, '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/[\u0300-\u036f]/g, '');
+
+  return folded.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+/** True when two display names fold to the same DJ slug. */
+export function djNamesMatch(a: string, b: string): boolean {
+  const left = slugFromName(a);
+  const right = slugFromName(b);
+  return left.length > 0 && left === right;
 }
 
 export function djInitials(name: string): string {

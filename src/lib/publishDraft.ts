@@ -115,6 +115,10 @@ async function syncEventDjs(
   eventId: string,
   djIds: string[],
 ): Promise<void> {
+  // A lineup that resolves to nobody (floor labels, unmatched names) must
+  // leave an existing manual selection in place.
+  if (djIds.length === 0) return;
+
   const { data, error } = await client
     .from('event_djs')
     .select('dj_id, position')
@@ -137,8 +141,6 @@ async function syncEventDjs(
     .eq('event_id', eventId);
 
   if (deleteError) throw new Error(formatPostgrestError(deleteError));
-
-  if (djIds.length === 0) return;
 
   const rows = djIds.map((dj_id, index) => ({
     event_id: eventId,

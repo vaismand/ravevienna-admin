@@ -2,7 +2,7 @@
  * Lineup artist parsing shared by the scraper and admin DJ import.
  */
 
-const COLLABORATION_SPLIT = /\s+(?:b2b|f2f|vs\.?)\s*/i;
+const COLLABORATION_SPLIT = /\s+(?:b2b|f2f|vs\.?|&)\s*/i;
 
 /** Normalize whitespace and invisible characters for matching. */
 export function normalizeLineupArtistName(name: string): string {
@@ -17,7 +17,8 @@ function lineupDedupeKey(name: string): string {
 }
 
 /**
- * Split "Annakonda B2B Stendhal Syndrome" / "AKOV F2F MANTA" into individual artists.
+ * Split "Annakonda B2B Stendhal Syndrome", "AKOV F2F MANTA",
+ * "A vs B", and "A & B" into individual artists.
  */
 export function splitLineupCollaborations(name: string): string[] {
   const clean = normalizeLineupArtistName(name);
