@@ -1,10 +1,12 @@
 import * as cheerio from "cheerio";
 
+import { parseLineupNames } from "../../../scripts/lib/lineupArtists.ts";
+import { collectDasWerkProgram } from "./dasWerkParse";
+import { extractLineup } from "./lineup";
 import {
   cleanText,
   guessGenres,
   http,
-  isRelevantRaveEvent,
   parseIsoDateTimeLocal,
   parsePrice,
   sleep,
@@ -63,33 +65,24 @@ async function enrichFromEventimTicketPage(
 }
 
 export async function scrapeDasWerk(source: ScrapeSource): Promise<ScrapedEvent[]> {
-  const { data: html } = await http.get(source.url);
+  const rawEvents = await collectDasWerkProgram(source.url, async (url) => {
+    const { data } = await http.get<string>(url);
+    return data;
+  }, {
+    pause: () => sleep(400),
+  });
 
-  const eventsMatch = html.match(/\\"events\\":\[(.*?)\]\}\]\}\]/s);
-
-  if (!eventsMatch?.[1]) {
+  if (rawEvents.length === 0) {
     console.log("Could not find Das Werk events payload");
     return [];
   }
 
-  let rawEvents: any[] = [];
-
-  try {
-    const cleanedJson = `[${eventsMatch[1]}]`
-      .replace(/\\"/g, '"')
-      .replace(/\\n/g, "\\n")
-      .replace(/\\u0026/g, "&");
-
-    rawEvents = JSON.parse(cleanedJson);
-  } catch (error) {
-    console.error("Could not parse Das Werk JSON payload:", error);
-    return [];
-  }
+  console.log(`Das Werk: loaded ${rawEvents.length} events across program pages`);
 
   const events: ScrapedEvent[] = [];
 
   for (const item of rawEvents) {
-    const local = parseIsoDateTimeLocal(item.dateIso);
+    const local = parseIsoDateTimeLocal(item.dateIso ?? "");
 
     const title = item.title ?? "Untitled event";
     const description = item.description ?? "";
@@ -99,11 +92,16 @@ export async function scrapeDasWerk(source: ScrapeSource): Promise<ScrapedEvent[
     const ticketData = await enrichFromEventimTicketPage(ticketUrl);
 
     const mergedDescription = [
-      ticketData?.description || description,
+      description,
+      ticketData?.description,
       actsLine ? `Lineup: ${actsLine}` : "",
     ]
       .filter(Boolean)
       .join("\n\n");
+
+    const lineup = parseLineupNames(
+      [...parseLineupNames(actsLine), ...extractLineup(description)].join("\n"),
+    );
 
     const genres = ticketData?.genres?.length
       ? ticketData.genres
@@ -116,6 +114,7 @@ export async function scrapeDasWerk(source: ScrapeSource): Promise<ScrapedEvent[
       price: ticketData?.price ?? parsePrice(description),
       genres,
       description: mergedDescription,
+      lineup,
       ticket_url: ticketUrl,
       image_url: item.flyerUrl || null,
       external_url: source.url,
@@ -130,5 +129,5 @@ export async function scrapeDasWerk(source: ScrapeSource): Promise<ScrapedEvent[
     await sleep(350);
   }
 
-  return events.filter(isRelevantRaveEvent);
+  return events;
 }

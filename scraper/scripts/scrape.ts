@@ -2,12 +2,19 @@ import { createClient } from "@supabase/supabase-js";
 
 import { loadScriptEnv } from "../../scripts/lib/loadEnv.ts";
 import { normalizeEventGenres } from "../../scripts/lib/genres.ts";
+import { parseLineupNames } from "../../scripts/lib/lineupArtists.ts";
 import { getTodayDateKey, parseDateKey, toDateKey } from "../../scripts/lib/dates.ts";
 
 loadScriptEnv();
+import {
+  classifyEdmEvent,
+  confidenceForEdmDecision,
+  draftStatusForEdmDecision,
+} from "./scrapers/edmFilter";
 import { enrichEventText } from "./scrapers/lineup";
 import { scrapers } from "./scrapers";
 import type { ScrapedEvent, ScrapeSource } from "./scrapers/types";
+import { runScrapersIsolated } from "./scrapeRun";
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -70,8 +77,15 @@ function buildDraftRow(
   existingLineup: string[]
 ) {
   const enriched = enrichEventText(event.description);
-  const lineup =
-    enriched.lineup.length > 0 ? enriched.lineup : existingLineup;
+  const parsedLineup = parseLineupNames(
+    [...(event.lineup ?? []), ...enriched.lineup].join("\n"),
+  );
+  const lineup = parsedLineup.length > 0 ? parsedLineup : existingLineup;
+  const edm = classifyEdmEvent({
+    title: event.title,
+    description: enriched.description ?? event.description,
+    genres: event.genres,
+  });
 
   return {
     source_id: source.id,
@@ -87,11 +101,17 @@ function buildDraftRow(
     image_url: event.image_url,
     external_url: event.external_url,
     external_id: event.external_id,
-    status: "pending" as const,
-    confidence: event.event_date ? 0.8 : 0.35,
+    status: draftStatusForEdmDecision(edm.decision),
+    confidence: confidenceForEdmDecision(edm.decision, event.event_date),
     raw_data: {
       ...event.raw_data,
-      extracted_lineup: enriched.lineup,
+      extracted_lineup: lineup,
+      edm_decision: edm.decision,
+      edm_matches: {
+        edm: edm.edmMatches,
+        non_edm: edm.nonEdmMatches,
+        borderline: edm.borderlineMatches,
+      },
     },
   };
 }
@@ -127,13 +147,15 @@ async function upsertDraftEvents(source: ScrapeSource, events: ScrapedEvent[]) {
   ]);
 
   if (existingError) {
-    console.error(`Could not load existing drafts for ${source.name}:`, existingError);
-    return;
+    throw new Error(
+      `Could not load existing drafts for ${source.name}: ${existingError.message}`,
+    );
   }
 
   if (liveEventsError) {
-    console.error(`Could not load live events for ${source.name}:`, liveEventsError);
-    return;
+    throw new Error(
+      `Could not load live events for ${source.name}: ${liveEventsError.message}`,
+    );
   }
 
   const existingByExternalId = new Map<string, ExistingDraftRow>(
@@ -199,8 +221,7 @@ async function upsertDraftEvents(source: ScrapeSource, events: ScrapedEvent[]) {
   });
 
   if (error) {
-    console.error(`Upsert failed for ${source.name}:`, error);
-    return;
+    throw new Error(`Upsert failed for ${source.name}: ${error.message}`);
   }
 
   const inserted = rowsToUpsert.filter(
@@ -209,7 +230,7 @@ async function upsertDraftEvents(source: ScrapeSource, events: ScrapedEvent[]) {
   const updated = rowsToUpsert.length - inserted;
 
   console.log(
-    `Draft sync for ${source.name}: ${inserted} new, ${updated} pending updated (past skipped ${skippedPast}, protected ${skippedProtected}, already live ${skippedAlreadyLive}, other status ${skippedNonPending})`
+    `Draft sync for ${source.name}: ${inserted} new, ${updated} updated (past skipped ${skippedPast}, protected ${skippedProtected}, already live ${skippedAlreadyLive}, other status ${skippedNonPending})`
   );
 }
 
@@ -224,24 +245,28 @@ async function main() {
     throw error;
   }
 
-  for (const source of sources ?? []) {
-    console.log(`Scraping ${source.name}...`);
+  const results = await runScrapersIsolated((sources ?? []) as ScrapeSource[], scrapers, {
+    afterScrape: async (source, events) => {
+      await upsertDraftEvents(source, events as ScrapedEvent[]);
 
-    const scrape = scrapers[source.name];
+      const { error: updateError } = await supabase
+        .from("event_sources")
+        .update({ last_checked_at: new Date().toISOString() })
+        .eq("id", source.id);
 
-    if (!scrape) {
-      console.log(`No scraper implemented yet for ${source.name}`);
-      continue;
-    }
+      if (updateError) {
+        throw updateError;
+      }
+    },
+  });
 
-    const events = await scrape(source);
-
-    await upsertDraftEvents(source, events);
-
-    await supabase
-      .from("event_sources")
-      .update({ last_checked_at: new Date().toISOString() })
-      .eq("id", source.id);
+  const failed = results.filter((result) => result.status === "failed");
+  if (failed.length > 0) {
+    throw new Error(
+      `Scrape finished with ${failed.length} failing source(s): ${failed
+        .map((result) => result.sourceName)
+        .join(", ")}`,
+    );
   }
 }
 

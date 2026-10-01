@@ -4,7 +4,6 @@ import {
   cleanText,
   guessGenres,
   http,
-  isRelevantRaveEvent,
   parseEuropeanPrice,
   parsePrice,
   sleep,
@@ -94,7 +93,7 @@ function isFluccRaveStartTime(startTime: string | null): boolean {
 }
 
 function isRelevantFluccEvent(event: ScrapedEvent): boolean {
-  return isRelevantRaveEvent(event) && isFluccRaveStartTime(event.start_time);
+  return isFluccRaveStartTime(event.start_time);
 }
 
 function parseMoneyToken(value: string): number | null {

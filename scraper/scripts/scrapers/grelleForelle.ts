@@ -1,11 +1,11 @@
 import * as cheerio from "cheerio";
 
+import { parseGrelleDateFromTitle } from "./eventYear";
 import {
   cleanText,
   decodeHtml,
   guessGenres,
   http,
-  isRelevantRaveEvent,
   parseEuropeanPrice,
   parsePrice,
   sleep,
@@ -68,18 +68,6 @@ async function enrichFromTicketIoPage(ticketUrl: string | null): Promise<{
     console.log(error.response?.status ?? error.message);
     return null;
   }
-}
-
-function parseGrelleDateFromTitle(title: string): string | null {
-  const match = title.match(/(\d{1,2})\/(\d{1,2})/);
-
-  if (!match) return null;
-
-  const day = match[1].padStart(2, "0");
-  const month = match[2].padStart(2, "0");
-  const year = "2026";
-
-  return `${year}-${month}-${day}`;
 }
 
 function parseGrelleStartTime(text: string): string | null {
@@ -196,7 +184,7 @@ export async function scrapeGrelleForelle(
   for (const url of urls) {
     const event = await scrapeGrelleForelleEventPage(url, source);
 
-    if (event && isRelevantRaveEvent(event)) {
+    if (event) {
       events.push(event);
     }
 

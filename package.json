@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build && npm run build:scripts",
     "build:scripts": "tsx scripts/bundle-server-scripts.ts",
     "lint": "eslint .",
-    "test": "node --import tsx --test scripts/publishDraft.test.ts",
+    "test": "node --import tsx --test scripts/publishDraft.test.ts scraper/scripts/scrapers/*.test.ts scraper/scripts/*.test.ts",
     "preview": "vite preview",
     "scrape": "tsx scripts/entries/scrape.entry.ts",
     "scrape:restore-drafts": "tsx scraper/scripts/restorePublishedDrafts.ts",

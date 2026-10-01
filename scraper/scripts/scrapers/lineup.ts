@@ -1,4 +1,8 @@
-import { isLineupFloorLabel, splitLineupCollaborations } from "../../../scripts/lib/lineupArtists.ts";
+import {
+  isLineupFloorLabel,
+  normalizeLineupLine,
+  parseLineupNames,
+} from "../../../scripts/lib/lineupArtists.ts";
 
 const LINEUP_HEADER_REGEX =
   /^(?:line[\s-]?up|artists?|djs?|acts?|with|w\/)\s*:?\s*$/i;
@@ -7,27 +11,6 @@ const GLUED_LINEUP_HEADER_REGEX = /([!?.…])(\s*line[\s-]?up)\b/gi;
 const GLUED_AFTER_HEADER_REGEX = /(line[\s-]?up)(?=[A-ZÀ-ÖØ-Þ])/gi;
 const INLINE_LINEUP_HEADER_REGEX =
   /(?:^|[\s!?.…])((?:line[\s-]?up))\s*:?\s*/gi;
-
-const NON_ARTIST_LABELS = new Set([
-  "line up",
-  "lineup",
-  "line-up",
-  "artist",
-  "artists",
-  "dj",
-  "djs",
-  "act",
-  "acts",
-  "with",
-  "w/",
-  "tba",
-  "tbc",
-  "t.b.a",
-  "more tba",
-]);
-
-const MIN_ARTIST_LENGTH = 2;
-const MAX_ARTIST_LENGTH = 80;
 
 function normalizeSpaces(value: string): string {
   return value.replace(/[ \t]+/g, " ").trim();
@@ -70,96 +53,62 @@ function prepareTextForLineup(raw: string): string {
 }
 
 function isLineupHeaderLine(line: string): boolean {
-  const clean = normalizeSpaces(line.replace(/^[-–—•·*]+\s*/, ""));
+  const clean = normalizeLineupLine(line).replace(/^[-–—•·*]+\s*/, "");
   return LINEUP_HEADER_REGEX.test(clean);
 }
 
-function isValidArtistName(name: string): boolean {
-  const clean = normalizeSpaces(
-    name.replace(/^[-–—•·*]+\s*/, "").replace(/^:+/, "")
-  );
+function isLineupStopLine(line: string): boolean {
+  const clean = normalizeLineupLine(line);
+  if (!clean || isLineupFloorLabel(clean)) return false;
 
-  if (!clean) return false;
-  if (isLineupFloorLabel(clean)) return false;
-  if (clean.length < MIN_ARTIST_LENGTH || clean.length > MAX_ARTIST_LENGTH) {
-    return false;
+  if (
+    /^(?:tickets?|doors?|entry|admission|presale|pre\s*sale|box\s*office|location|venue|address|awareness|facebook|instagram|no\s+photo|graphics\s+by)\b/i.test(
+      clean,
+    )
+  ) {
+    return true;
   }
 
-  const lowered = clean.toLowerCase();
-  if (NON_ARTIST_LABELS.has(lowered)) return false;
-  if (/^line[\s-]?up$/i.test(clean)) return false;
-
-  if (/^https?:\/\//i.test(clean)) return false;
-  if (/^\d+$/.test(clean)) return false;
-
-  return true;
+  const words = clean.split(/\s+/).filter(Boolean);
+  if (words.length >= 8) return true;
+  if (words.length >= 6 && /[.!?]/.test(clean)) return true;
+  return false;
 }
 
-function splitCamelCaseArtists(text: string): string[] {
-  return text
-    .split(/(?<=[a-zà-öø-ÿ0-9])(?=[A-ZÀ-ÖØ-Þ])/)
-    .map((part) => normalizeSpaces(part))
-    .filter(isValidArtistName);
-}
-
-function splitArtistChunk(chunk: string): string[] {
-  const clean = normalizeSpaces(chunk.replace(/^[-–—•·*]+\s*/, ""));
-  if (!clean) return [];
-
-  const collaborations = splitLineupCollaborations(clean);
-  if (collaborations.length > 1) {
-    return collaborations.flatMap((part) => splitArtistChunk(part));
-  }
-
-  const byDelimiters = clean
-    .split(/\n+|[,;|•·]+|\s\/\s+|\s\\\s+/)
-    .map((part) => normalizeSpaces(part))
-    .filter(Boolean);
-
-  if (byDelimiters.length > 1) {
-    return byDelimiters.flatMap((part) => {
-      const camel = splitCamelCaseArtists(part);
-      return camel.length > 0 ? camel : isValidArtistName(part) ? [part] : [];
-    });
-  }
-
-  const camel = splitCamelCaseArtists(clean);
-  if (camel.length > 1) {
-    return camel;
-  }
-
-  return isValidArtistName(clean) ? [clean] : [];
-}
-
-function dedupeArtists(artists: string[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-
-  for (const artist of artists) {
-    const key = artist.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(artist);
-  }
-
-  return result;
-}
-
-function findLineupStartIndex(lines: string[]): number {
-  let lastHeaderIndex = -1;
+function findLineupHeaderIndexes(lines: string[]): number[] {
+  const indexes: number[] = [];
 
   for (let index = 0; index < lines.length; index += 1) {
-    const line = normalizeSpaces(lines[index]);
-    if (!line) {
-      continue;
-    }
-
+    const line = lines[index] ?? "";
+    if (!line) continue;
     if (isLineupHeaderLine(line) || splitInlineHeaderLine(line).isHeader) {
-      lastHeaderIndex = index;
+      indexes.push(index);
     }
   }
 
-  return lastHeaderIndex;
+  return indexes;
+}
+
+function extractLineupWithoutHeader(rawLines: string[], lines: string[]): string[] {
+  const compact = lines.filter(Boolean).join("\n");
+  if (/\/\//.test(compact) && compact.length < 300 && !/[.!?]/.test(compact)) {
+    return parseLineupNames(compact);
+  }
+
+  const bullets = rawLines.filter((line) =>
+    /^\s*(?:[-–—*•·▪►▶]|\p{Extended_Pictographic})/u.test(line),
+  );
+  const floors = lines.filter(
+    (line) =>
+      isLineupFloorLabel(line) ||
+      /^(?:floor\s*\d+|main\s*floor|mainfloor|live|kitchen)\s*:/i.test(line),
+  );
+
+  if (bullets.length + floors.length >= 2) {
+    return parseLineupNames([...floors, ...bullets].join("\n"));
+  }
+
+  return [];
 }
 
 function isProseLineupMention(match: RegExpExecArray, line: string): boolean {
@@ -212,46 +161,36 @@ function splitInlineHeaderLine(line: string): {
   };
 }
 
-function collectLineupFromLines(lines: string[], startIndex: number): string[] {
-  const artists: string[] = [];
-  const headerLine = normalizeSpaces(lines[startIndex] ?? "");
-  const inlineHeader = splitInlineHeaderLine(headerLine);
+function collectLineupSections(lines: string[], headerIndexes: number[]): string {
+  const sections: string[] = [];
 
-  if (inlineHeader.remainder) {
-    artists.push(...splitArtistChunk(inlineHeader.remainder));
+  for (let header = 0; header < headerIndexes.length; header += 1) {
+    const start = headerIndexes[header] ?? 0;
+    const end = headerIndexes[header + 1] ?? lines.length;
+    const inline = splitInlineHeaderLine(lines[start] ?? "");
+    const section: string[] = [];
+
+    if (inline.remainder && !isLineupHeaderLine(inline.remainder)) {
+      section.push(inline.remainder);
+    }
+
+    for (let index = start + 1; index < end; index += 1) {
+      const line = lines[index] ?? "";
+      if (!line) continue;
+      if (isLineupHeaderLine(line) || splitInlineHeaderLine(line).isHeader) break;
+      if (isLineupStopLine(line)) break;
+      section.push(line);
+    }
+
+    if (section.length > 0) sections.push(section.join("\n"));
   }
 
-  let index = startIndex + 1;
-
-  while (index < lines.length) {
-    const line = normalizeSpaces(lines[index]);
-
-    if (!line) {
-      index += 1;
-      continue;
-    }
-
-    if (isLineupHeaderLine(line)) {
-      break;
-    }
-
-    if (
-      /^(tickets?|doors?|entry|admission|presale|location|venue|address)\b/i.test(
-        line
-      )
-    ) {
-      break;
-    }
-
-    artists.push(...splitArtistChunk(line));
-    index += 1;
-  }
-
-  return dedupeArtists(artists);
+  return sections.join("\n");
 }
 
 /**
  * Extract artist names from a lineup section inside event description text.
+ * Names that only show up in the description (no separate lineup field) are included.
  */
 export function extractLineup(description: string): string[] {
   if (!description?.trim()) {
@@ -259,15 +198,15 @@ export function extractLineup(description: string): string[] {
   }
 
   const prepared = prepareTextForLineup(description);
-  const lines = prepared.split("\n").map((line) => line.trim());
+  const rawLines = prepared.split("\n");
+  const lines = rawLines.map((line) => normalizeLineupLine(line));
+  const headerIndexes = findLineupHeaderIndexes(lines);
 
-  const startIndex = findLineupStartIndex(lines);
-  if (startIndex === -1) {
-    return [];
+  if (headerIndexes.length === 0) {
+    return extractLineupWithoutHeader(rawLines, lines);
   }
 
-  const artists = collectLineupFromLines(lines, startIndex);
-  return artists.length > 0 ? artists : [];
+  return parseLineupNames(collectLineupSections(lines, headerIndexes));
 }
 
 function formatDescriptionBody(raw: string): string {
@@ -291,7 +230,7 @@ export function stripLineupFromDescription(description: string): string {
   const prepared = prepareTextForLineup(description);
   const lines = prepared.split("\n").map((line) => line.trim());
 
-  const startIndex = findLineupStartIndex(lines);
+  const startIndex = findLineupHeaderIndexes(lines)[0] ?? -1;
   if (startIndex === -1) {
     return formatDescriptionBody(description);
   }

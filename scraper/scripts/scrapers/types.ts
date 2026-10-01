@@ -5,6 +5,8 @@ export type ScrapedEvent = {
   price: number | null;
   genres: string[];
   description: string | null;
+  /** Optional pre-parsed DJ names. Merged with names extracted from the description. */
+  lineup?: string[];
   ticket_url: string | null;
   image_url: string | null;
   external_url: string;

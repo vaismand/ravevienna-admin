@@ -4,7 +4,6 @@ import {
   cleanText,
   guessGenres,
   http,
-  isRelevantRaveEvent,
   parseEuropeanPrice,
   sleep,
 } from "./helpers";
@@ -103,15 +102,6 @@ function isMorningStartTime(startTime: string | null): boolean {
   return totalMinutes >= 5 * 60 && totalMinutes <= 12 * 60;
 }
 
-function isSassMorningEvent(event: ScrapedEvent): boolean {
-  if (event.title.toLowerCase().includes("morgengymnastik")) return true;
-  return isMorningStartTime(event.start_time);
-}
-
-function isRelevantSassEvent(event: ScrapedEvent): boolean {
-  return isRelevantRaveEvent(event) || isSassMorningEvent(event);
-}
-
 export async function scrapeSass(source: ScrapeSource): Promise<ScrapedEvent[]> {
   const eventsUrl = source.url || DEFAULT_EVENTS_URL;
   const { data: html } = await http.get(eventsUrl);
@@ -182,5 +172,5 @@ export async function scrapeSass(source: ScrapeSource): Promise<ScrapedEvent[]> 
     await sleep(400);
   }
 
-  return events.filter(isRelevantSassEvent);
+  return events;
 }

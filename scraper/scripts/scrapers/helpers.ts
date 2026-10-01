@@ -5,6 +5,7 @@ import {
   detectGenresFromText,
   normalizeEventGenres,
 } from "../../../scripts/lib/genres.ts";
+import { classifyEdmEvent } from "./edmFilter";
 import type { ScrapedEvent } from "./types";
 
 export const http = axios.create({
@@ -105,85 +106,16 @@ export function parseIsoDateTimeLocal(value: string): {
   };
 }
 
-function textHasKeyword(text: string, keyword: string): boolean {
-  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(
-    `(?:^|[^\\w])${escaped.replace(/\s+/g, "\\s+")}(?:[^\\w]|$)`,
-    "i"
-  );
-  return pattern.test(text);
-}
-
+/**
+ * Keep and review decisions still produce a draft. Clear non-EDM is rejected
+ * later by the scrape runner instead of being dropped here.
+ */
 export function isRelevantRaveEvent(event: ScrapedEvent): boolean {
-  const text = `${event.title} ${event.description ?? ""} ${event.genres.join(" ")}`
-    .toLowerCase();
-
-  const hardRejectKeywords = [
-    "gregor hägele",
-    "gregor haegele",
-    "nervy",
-    "krs-one",
-    "set it off",
-    "audio88",
-    "yassin",
-    "i killed the prom queen",
-    "touché amor",
-    "touche amor",
-    "immortal disfigurement",
-    "gutrectomy",
-    "don broco",
-    "hands like houses",
-    "broadside",
-    "destroy boys",
-    "drowning pool",
-    "don west",
-    "lance butters",
-    "sampagne",
-    "yami safdie",
-    "neunundneunzig",
-    "concert",
-    "tour",
-    "band",
-    "rock",
-    "metal",
-    "hip-hop",
-    "hip hop",
-    "rap",
-    "live concert",
-  ];
-
-  if (hardRejectKeywords.some((keyword) => textHasKeyword(text, keyword))) {
-    return false;
-  }
-
-  const strongRaveKeywords = [
-    "rave",
-    "techno",
-    "hard techno",
-    "drum and bass",
-    "dnb",
-    "bass",
-    "house",
-    "trance",
-    "psytrance",
-    "goa",
-    "acid",
-    "breakbeat",
-    "jungle",
-    "garage",
-    "electro",
-    "tek",
-    "soundsystem",
-    "club",
-    "afterparty",
-    "mainfloor",
-    "kitchen",
-    "lineup",
-    "dj",
-    "b2b",
-    "pres.",
-    "presents",
-  ];
-
-  return strongRaveKeywords.some((keyword) => textHasKeyword(text, keyword));
+  return (
+    classifyEdmEvent({
+      title: event.title,
+      description: event.description,
+      genres: event.genres,
+    }).decision !== "reject"
+  );
 }
