@@ -323,6 +323,8 @@ describe("scoreDjCandidate", () => {
       },
       {
         name: "KØ:LAB",
+        displayName: "Not the display name",
+        username: "kolab",
         city: "Copenhagen",
         country: "Denmark",
         profileUrl: "https://soundcloud.com/kolab",
@@ -334,7 +336,8 @@ describe("scoreDjCandidate", () => {
         scoreDjCandidate(
           example.name,
           candidate({
-            name: example.name,
+            name: example.displayName ?? example.name,
+            username: example.username ?? example.name,
             city: example.city,
             country: example.country,
             followers: 40000,
@@ -608,6 +611,85 @@ describe("planDjFieldUpdates", () => {
     });
     assert.equal(berlin.updates.city, undefined);
     assert.equal(berlin.updates.country, undefined);
+  });
+
+  it("does not clear the city when the replacement location is junk or missing", () => {
+    const viennaDefault = emptyDj({
+      name: "CALYX",
+      slug: "calyx",
+      city: "Vienna",
+      country: "Austria",
+    });
+
+    for (const city of ["Tsunami", null]) {
+      const plan = planDjFieldUpdates({
+        dj: viennaDefault,
+        soundcloud: candidate({
+          name: "CALYX",
+          city,
+          country: "United Kingdom",
+          profileUrl: "https://soundcloud.com/calyx",
+          soundcloudUrl: "https://soundcloud.com/calyx",
+        }),
+        ra: null,
+        force: false,
+        fixDefaultLocation: true,
+        columns: COLUMNS,
+      });
+
+      assert.equal(plan.updates.city, undefined);
+      assert.equal(plan.updates.country, undefined);
+      assert.equal(Object.values(plan.updates).includes(null), false);
+      assert.ok(plan.skippedNonEmpty.includes("country"));
+    }
+  });
+
+  it("does not overwrite filled fields when only-empty is set, even with force", () => {
+    const plan = planDjFieldUpdates({
+      dj: emptyDj({
+        bio: "Hand written bio",
+        image_url: null,
+      }),
+      soundcloud: candidate({
+        name: "Stimming",
+        bio: "Imported bio",
+        avatarUrl: "https://i1.sndcdn.com/avatars-example-t500x500.jpg",
+        profileUrl: "https://soundcloud.com/stimming",
+        soundcloudUrl: "https://soundcloud.com/stimming",
+      }),
+      ra: null,
+      force: true,
+      onlyEmpty: true,
+      columns: COLUMNS,
+    });
+
+    assert.equal(plan.updates.bio, undefined);
+    assert.equal(plan.updates.image_url, "https://i1.sndcdn.com/avatars-example-t500x500.jpg");
+    assert.ok(plan.skippedNonEmpty.includes("bio"));
+
+    const location = planDjFieldUpdates({
+      dj: emptyDj({
+        name: "CALYX",
+        slug: "calyx",
+        city: "Vienna",
+        country: "Austria",
+      }),
+      soundcloud: candidate({
+        name: "CALYX",
+        city: "South London",
+        country: "United Kingdom",
+        profileUrl: "https://soundcloud.com/calyx",
+        soundcloudUrl: "https://soundcloud.com/calyx",
+      }),
+      ra: null,
+      force: true,
+      onlyEmpty: true,
+      fixDefaultLocation: true,
+      columns: COLUMNS,
+    });
+
+    assert.equal(location.updates.city, undefined);
+    assert.equal(location.updates.country, undefined);
   });
 });
 

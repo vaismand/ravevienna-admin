@@ -296,6 +296,7 @@ export function matchDjProfiles(input: {
   force: boolean;
   columns: Set<string>;
   fixDefaultLocation?: boolean;
+  onlyEmpty?: boolean;
 }): ProfileMatchOutcome {
   const evidence = input.evidence;
   const savedUrl = savedSoundCloudUrl(input.dj);
@@ -367,6 +368,7 @@ export function matchDjProfiles(input: {
     force: input.force,
     columns: input.columns,
     fixDefaultLocation: input.fixDefaultLocation,
+    onlyEmpty: input.onlyEmpty,
   });
 
   return {

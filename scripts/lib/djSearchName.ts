@@ -1,13 +1,27 @@
 /**
  * Normalize DJ names for search matching.
  * Case, accents, a leading "DJ ", and live-set markers do not change the match.
+ * Ø/ø fold to o, Æ/æ to ae, ß to ss, and Ł/ł to l before other marks are stripped.
  */
 
 const LIVE_GROUP =
   /\s*[([｛【]\s*(?:live(?:\s*set)?|dj\s*set|liveset)\s*[)\]｝】]\s*/gi;
 
+function foldLatinLetters(value: string): string {
+  return value
+    .replace(/ß/g, "ss")
+    .replace(/ẞ/g, "ss")
+    .replace(/æ/g, "ae")
+    .replace(/Æ/g, "ae")
+    .replace(/ø/g, "o")
+    .replace(/Ø/g, "o")
+    .replace(/ł/g, "l")
+    .replace(/Ł/g, "l");
+}
+
 export function normalizeDjSearchName(name: string): string {
-  const withoutMarks = name.normalize("NFD").replace(/\p{M}/gu, "");
+  const folded = foldLatinLetters(name);
+  const withoutMarks = folded.normalize("NFD").replace(/\p{M}/gu, "");
   const withoutLiveGroups = withoutMarks.replace(LIVE_GROUP, " ");
 
   let normalized = withoutLiveGroups

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { normalizeCountryName } from "./countryNames.ts";
+import { nameMatchTier } from "./djCandidateScore.ts";
 import {
   compactDjSearchName,
   djSearchNamesMatch,
@@ -30,6 +31,23 @@ describe("normalizeDjSearchName", () => {
   it("matches prefix and live variants as the same artist", () => {
     assert.equal(djSearchNamesMatch("DJ Stimming (live)", "Stimming"), true);
     assert.equal(djSearchNamesMatch("Helena Hauff", "Someone Else"), false);
+  });
+
+  it("folds Ø, Æ, ß, and Ł instead of deleting them", () => {
+    assert.equal(compactDjSearchName("KØ:LAB"), "kolab");
+    assert.equal(compactDjSearchName("SØS"), "sos");
+    assert.equal(normalizeDjSearchName("Straße"), "strasse");
+    assert.equal(normalizeDjSearchName("Ægir"), "aegir");
+    assert.equal(compactDjSearchName("Łódź"), "lodz");
+    assert.equal(
+      nameMatchTier("KØ:LAB", {
+        name: "Not the display name",
+        username: "kolab",
+        profileUrl: "https://soundcloud.com/kolab",
+        soundcloudUrl: "https://soundcloud.com/kolab",
+      }),
+      "exact"
+    );
   });
 });
 

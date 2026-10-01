@@ -326,34 +326,49 @@ export function selectDjsForEnrichment(
   return rows;
 }
 
-async function loadEventCounts(supabase: SupabaseClient): Promise<Map<string, number>> {
-  const counts = new Map<string, number>();
-  const pageSize = 1000;
+/** PostgREST returns at most this many rows unless the query is ranged. */
+export const DJ_PAGE_SIZE = 1000;
+
+export async function fetchAllPages<T>(
+  loadPage: (from: number, to: number) => Promise<T[]>,
+  pageSize = DJ_PAGE_SIZE
+): Promise<T[]> {
+  const all: T[] = [];
   let from = 0;
 
   for (;;) {
+    const rows = await loadPage(from, from + pageSize - 1);
+    all.push(...rows);
+    if (rows.length < pageSize) {
+      break;
+    }
+    from += pageSize;
+  }
+
+  return all;
+}
+
+async function loadEventCounts(supabase: SupabaseClient): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  const rows = await fetchAllPages(async (from, to) => {
     const { data, error } = await supabase
       .from("event_djs")
       .select("dj_id")
-      .range(from, from + pageSize - 1);
+      .range(from, to);
 
     if (error) {
       throw new Error(`Failed to load event links: ${error.message}`);
     }
 
-    const rows = data ?? [];
-    for (const row of rows) {
-      const id = typeof row.dj_id === "string" ? row.dj_id : "";
-      if (!id) {
-        continue;
-      }
-      counts.set(id, (counts.get(id) ?? 0) + 1);
-    }
+    return data ?? [];
+  });
 
-    if (rows.length < pageSize) {
-      break;
+  for (const row of rows) {
+    const id = typeof row.dj_id === "string" ? row.dj_id : "";
+    if (!id) {
+      continue;
     }
-    from += pageSize;
+    counts.set(id, (counts.get(id) ?? 0) + 1);
   }
 
   return counts;
@@ -363,21 +378,29 @@ async function fetchDjs(
   supabase: SupabaseClient,
   options: SearchEnrichDjsOptions
 ): Promise<{ djs: DjEnrichmentRow[]; missingSlugs: string[] }> {
-  let query = supabase.from("djs").select("*").order("name", { ascending: true });
   const slugs = (options.slugs ?? []).map((slug) => slug.trim()).filter(Boolean);
+  const rawRows = await fetchAllPages(async (from, to) => {
+    let query = supabase
+      .from("djs")
+      .select("*")
+      .order("name", { ascending: true })
+      .range(from, to);
 
-  if (slugs.length === 1) {
-    query = query.eq("slug", slugs[0]!);
-  } else if (slugs.length > 1) {
-    query = query.in("slug", slugs);
-  }
+    if (slugs.length === 1) {
+      query = query.eq("slug", slugs[0]!);
+    } else if (slugs.length > 1) {
+      query = query.in("slug", slugs);
+    }
 
-  const { data, error } = await query;
-  if (error) {
-    throw new Error(`Failed to fetch DJs: ${error.message}`);
-  }
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`Failed to fetch DJs: ${error.message}`);
+    }
 
-  const djs = ((data ?? []) as Record<string, unknown>[]).map(toDj);
+    return (data ?? []) as Record<string, unknown>[];
+  });
+
+  const djs = rawRows.map(toDj);
   const found = new Set(djs.map((dj) => dj.slug));
   const missingSlugs = slugs.filter((slug) => !found.has(slug));
   const eventCounts = options.linked ? await loadEventCounts(supabase) : new Map<string, number>();
@@ -593,6 +616,7 @@ export async function searchEnrichDjs(
         evidence: evidenceResult.evidence,
         force: options.force === true,
         fixDefaultLocation: options.fixDefaultLocation === true,
+        onlyEmpty: options.onlyEmpty === true,
         columns,
       });
 

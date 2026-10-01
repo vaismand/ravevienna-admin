@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { applyRaArtistDetail, parseRaSearchPayload } from "./raArtistSearch.ts";
-import { selectDjsForEnrichment, soundCloudLookupPlan } from "./searchEnrichDjs.ts";
+import {
+  DJ_PAGE_SIZE,
+  fetchAllPages,
+  selectDjsForEnrichment,
+  soundCloudLookupPlan,
+} from "./searchEnrichDjs.ts";
 import { SoundCloudPublicClient } from "./soundcloudPublicClient.ts";
 import type { DjEnrichmentRow } from "./djFieldPlan.ts";
 import {
@@ -197,6 +202,52 @@ describe("SoundCloud resolve", () => {
         new Response(JSON.stringify({ kind: "track", id: 7, title: "Set" }), { status: 200 }),
     });
     assert.equal(await client.resolveUser("https://soundcloud.com/tomagan"), null);
+  });
+});
+
+describe("fetchAllPages", () => {
+  it("reads every page before active, linked, and only-empty filters", async () => {
+    assert.equal(DJ_PAGE_SIZE, 1000);
+
+    const filled = djRow("early", "Early", true);
+    filled.raw.bio = "kept";
+    filled.raw.image_url = "https://img.example/a.jpg";
+    filled.raw.city = "Vienna";
+    filled.raw.country = "Austria";
+    filled.raw.genres = ["techno"];
+    filled.raw.instagram_url = "https://instagram.com/early";
+    filled.raw.soundcloud_url = "https://soundcloud.com/early";
+    filled.raw.website_url = "https://early.example";
+    filled.raw.spotify_url = "https://open.spotify.com/artist/early";
+    filled.bio = "kept";
+
+    const inactive = djRow("inactive", "Inactive", false);
+    const late = djRow("late", "Late", true);
+
+    const ranges: Array<[number, number]> = [];
+    const pages = [
+      [filled, inactive],
+      [late],
+    ];
+    const rows = await fetchAllPages(async (from, to) => {
+      ranges.push([from, to]);
+      return pages.shift() ?? [];
+    }, 2);
+
+    const selected = selectDjsForEnrichment(rows, new Map([["late", 4], ["early", 9]]), {
+      active: true,
+      linked: true,
+      onlyEmpty: true,
+    });
+
+    assert.deepEqual(ranges, [
+      [0, 1],
+      [2, 3],
+    ]);
+    assert.deepEqual(
+      selected.map((dj) => dj.id),
+      ["late"]
+    );
   });
 });
 

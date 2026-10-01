@@ -109,7 +109,7 @@ Usage:
 --limit N     Process at most N DJs
 --active      Only DJs with is_active = true
 --linked      Only DJs linked to events, highest event count first
---only-empty  Skip DJs that already have bio, image, country, city, genres, and links
+--only-empty  Skip complete DJs. Writes only empty fields, even with --force
 --slug        Only this slug. Repeat the flag to pass several.
 --force       Overwrite non-empty fields on auto-confident matches
 --fix-default-location

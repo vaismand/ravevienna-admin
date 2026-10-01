@@ -82,19 +82,19 @@ function isViennaAustriaDefault(dj: DjEnrichmentRow): boolean {
 function elsewhereLocation(
   candidate: DjProfileCandidate | null,
   artistName: string
-): { city: string | null; country: string } | null {
+): { city: string; country: string } | null {
   if (!candidate) {
     return null;
   }
   const place = concreteLocation(candidate.city, candidate.country);
   const country = normalizeCountryName(place.country);
-  if (!country) {
-    return null;
-  }
   const city =
     place.city && !isJunkCityName(place.city, artistName)
       ? cleanText(place.city, 120)
       : null;
+  if (!country || !city) {
+    return null;
+  }
   if (countryTier(country, city) === "austria") {
     return null;
   }
@@ -109,8 +109,11 @@ export function planDjFieldUpdates(input: {
   columns: Set<string>;
   /** Replace a Vienna/Austria default when the accepted profile is elsewhere. */
   fixDefaultLocation?: boolean;
+  /** When set, filled fields stay put even if `force` is also set. */
+  onlyEmpty?: boolean;
 }): FieldPlan {
-  const { dj, soundcloud, ra, force, columns } = input;
+  const { dj, soundcloud, ra, columns } = input;
+  const overwriteFilled = input.force && input.onlyEmpty !== true;
   const updates: Record<string, unknown> = {};
   const filled: string[] = [];
   const skippedNonEmpty: string[] = [];
@@ -198,10 +201,10 @@ export function planDjFieldUpdates(input: {
   ];
   const mappedGenres = normalizeSpotifyGenres(
     genreTags,
-    force || isGenresEmpty(dj.genres) ? [] : (dj.genres ?? [])
+    overwriteFilled || isGenresEmpty(dj.genres) ? [] : (dj.genres ?? [])
   );
-  if (isGenresEmpty(dj.genres) || force) {
-    const nextGenres = force
+  if (isGenresEmpty(dj.genres) || overwriteFilled) {
+    const nextGenres = overwriteFilled
       ? normalizeSpotifyGenres(genreTags, [])
       : mappedGenres;
     if (nextGenres.length > 0) {
@@ -223,7 +226,7 @@ export function planDjFieldUpdates(input: {
       continue;
     }
 
-    if (!isEmptyValue(dj.raw[column]) && !force) {
+    if (!isEmptyValue(dj.raw[column]) && !overwriteFilled) {
       pushUnique(skippedNonEmpty, column);
       continue;
     }
@@ -232,7 +235,11 @@ export function planDjFieldUpdates(input: {
     filled.push(column);
   }
 
-  if (input.fixDefaultLocation && isViennaAustriaDefault(dj)) {
+  if (
+    input.fixDefaultLocation &&
+    input.onlyEmpty !== true &&
+    isViennaAustriaDefault(dj)
+  ) {
     const elsewhere =
       elsewhereLocation(soundcloud, artistName) ?? elsewhereLocation(ra, artistName);
     if (elsewhere) {
@@ -242,6 +249,9 @@ export function planDjFieldUpdates(input: {
           continue;
         }
         const value = column === "city" ? elsewhere.city : elsewhere.country;
+        if (!value) {
+          continue;
+        }
         const skipAt = skippedNonEmpty.indexOf(column);
         if (skipAt >= 0) {
           skippedNonEmpty.splice(skipAt, 1);
