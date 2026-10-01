@@ -1,22 +1,25 @@
 /**
  * Normalize DJ names for search matching.
  * Case, accents, a leading "DJ ", and live-set markers do not change the match.
- * Ø/ø fold to o, Æ/æ to ae, ß to ss, and Ł/ł to l before other marks are stripped.
+ * Ø/ø, Æ/æ, ß, and other diacritics use the shared slug fold. Ł/ł becomes l
+ * because that helper drops it. Punctuation is left for the search rules below.
  */
+
+import { slugFromName } from "../../src/lib/djUtils.ts";
 
 const LIVE_GROUP =
   /\s*[([｛【]\s*(?:live(?:\s*set)?|dj\s*set|liveset)\s*[)\]｝】]\s*/gi;
 
 function foldLatinLetters(value: string): string {
-  return value
-    .replace(/ß/g, "ss")
-    .replace(/ẞ/g, "ss")
-    .replace(/æ/g, "ae")
-    .replace(/Æ/g, "ae")
-    .replace(/ø/g, "o")
-    .replace(/Ø/g, "o")
-    .replace(/ł/g, "l")
-    .replace(/Ł/g, "l");
+  return Array.from(value, (char) => {
+    if (char === "ł" || char === "Ł") {
+      return "l";
+    }
+    if (/\s/.test(char)) {
+      return char;
+    }
+    return slugFromName(char) || char;
+  }).join("");
 }
 
 export function normalizeDjSearchName(name: string): string {
