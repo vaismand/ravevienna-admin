@@ -1,10 +1,4 @@
-import {
-  concreteLocation,
-  countriesMatch,
-  countryTier,
-  isViennaCity,
-  isVaguePlaceName,
-} from "./countryNames.ts";
+import { countriesMatch } from "./countryNames.ts";
 import {
   AUTO_ACCEPT_MARGIN,
   decideDjCandidates,
@@ -20,7 +14,7 @@ import {
   type DjEnrichmentRow,
   type FieldPlan,
 } from "./djFieldPlan.ts";
-import { djSearchNamesMatch } from "./djSearchName.ts";
+import { djSearchNamesMatch, isGenericDjName } from "./djSearchName.ts";
 import {
   canonicalSoundCloudUrl,
   sameInstagram,
@@ -156,23 +150,17 @@ function asReview(decision: CandidateDecision): CandidateDecision {
   };
 }
 
-/** Home base only. Gigs in Vienna or Austria add score and do not unlock auto. */
-function homeAustriaOrVienna(candidate: DjProfileCandidate): boolean {
-  if (isVaguePlaceName(candidate.city)) {
-    return false;
-  }
-  const place = concreteLocation(candidate.city, candidate.country);
-  return countryTier(place.country, place.city) === "austria" || isViennaCity(place.city);
-}
-
 export function raOnlyAutoAllowed(
   candidate: DjProfileCandidate,
   margin: number | null
 ): boolean {
+  if (isGenericDjName(candidate.name)) {
+    return false;
+  }
   if (margin != null && margin < AUTO_ACCEPT_MARGIN) {
     return false;
   }
-  return homeAustriaOrVienna(candidate);
+  return true;
 }
 
 function savedSoundCloudUrl(dj: DjEnrichmentRow): string | null {
@@ -307,6 +295,7 @@ export function matchDjProfiles(input: {
   evidence: ProfileEvidence;
   force: boolean;
   columns: Set<string>;
+  fixDefaultLocation?: boolean;
 }): ProfileMatchOutcome {
   const evidence = input.evidence;
   const savedUrl = savedSoundCloudUrl(input.dj);
@@ -314,14 +303,18 @@ export function matchDjProfiles(input: {
     ? input.soundcloud.filter((candidate) => matchesSavedSoundCloud(candidate, savedUrl))
     : input.soundcloud;
   const soundcloud = confirmSavedSoundCloud(
-    decideDjCandidates(scoreAll(input.dj.name, soundcloudPool, input.ra, evidence)),
+    decideDjCandidates(
+      scoreAll(input.dj.name, soundcloudPool, input.ra, evidence),
+      input.dj.name
+    ),
     savedUrl
   );
   const ra = decideDjCandidates(
     preferLinkedTie(
       scoreAll(input.dj.name, input.ra, soundcloudPool, evidence),
       confirmedLinks(input.dj, soundcloud.chosen?.candidate ?? null)
-    )
+    ),
+    input.dj.name
   );
 
   let soundcloudPick: DjProfileCandidate | null = null;
@@ -373,6 +366,7 @@ export function matchDjProfiles(input: {
     ra: raPick,
     force: input.force,
     columns: input.columns,
+    fixDefaultLocation: input.fixDefaultLocation,
   });
 
   return {

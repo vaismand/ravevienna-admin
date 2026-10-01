@@ -113,6 +113,8 @@ export type SearchEnrichDjsOptions = {
   linked?: boolean;
   dryRun?: boolean;
   force?: boolean;
+  /** Replace a stored Vienna/Austria default when the accepted profile is elsewhere. */
+  fixDefaultLocation?: boolean;
   outputDir?: string | null;
   cacheDir?: string;
   minIntervalMs?: number;
@@ -590,6 +592,7 @@ export async function searchEnrichDjs(
         ra: raResult.artists.map(raCandidate),
         evidence: evidenceResult.evidence,
         force: options.force === true,
+        fixDefaultLocation: options.fixDefaultLocation === true,
         columns,
       });
 

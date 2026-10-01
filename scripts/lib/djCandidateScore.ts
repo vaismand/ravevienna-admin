@@ -1,6 +1,7 @@
 import { concreteLocation, countryTier, isViennaCity } from "./countryNames.ts";
 import {
   compactDjSearchName,
+  isGenericDjName,
   normalizeDjSearchName,
 } from "./djSearchName.ts";
 import { soundcloudPermalink } from "./profileLinks.ts";
@@ -84,6 +85,10 @@ function nameFields(
   );
   if (permalink) {
     fields.push(permalink.replace(/[-_]/g, " "));
+  }
+  const raSlug = candidate.profileUrl.match(/ra\.co\/dj\/([^/?#]+)/i)?.[1];
+  if (raSlug) {
+    fields.push(raSlug.replace(/[-_]/g, " "));
   }
   return fields.filter((field) => field.trim().length > 0);
 }
@@ -280,7 +285,8 @@ function canAutoAccept(scored: ScoredDjCandidate): boolean {
 }
 
 export function decideDjCandidates(
-  scored: ScoredDjCandidate[]
+  scored: ScoredDjCandidate[],
+  djName?: string
 ): CandidateDecision {
   const ranked = [...scored].sort((a, b) => {
     if (b.score !== a.score) {
@@ -308,13 +314,13 @@ export function decideDjCandidates(
   const eligible = canAutoAccept(best);
   const clearMargin =
     !runnerUpMeaningful || (margin != null && margin >= AUTO_ACCEPT_MARGIN);
-  const highEnough = runnerUpMeaningful
-    ? best.score >= AUTO_ACCEPT_MIN_SCORE
-    : best.nameTier === "exact"
-      ? best.score >= UNIQUE_EXACT_MIN_SCORE
-      : best.score >= AUTO_ACCEPT_MIN_SCORE;
+  const subjectName = djName?.trim() || best.candidate.name;
+  const generic = isGenericDjName(subjectName);
+  const anchored = best.signals.crossSoundcloud;
 
-  if (eligible && clearMargin && highEnough) {
+  // Location points only separate similar names. A single exact, non-generic
+  // name is accepted even when the profile is outside Austria.
+  if (eligible && clearMargin && (!generic || anchored)) {
     return {
       status: "auto",
       chosen: best,

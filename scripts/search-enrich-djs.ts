@@ -28,6 +28,7 @@ type CliOptions = {
   linked: boolean;
   dryRun: boolean;
   force: boolean;
+  fixDefaultLocation: boolean;
 };
 
 function parseArgs(argv: string[]): CliOptions {
@@ -40,6 +41,7 @@ function parseArgs(argv: string[]): CliOptions {
     linked: false,
     dryRun: true,
     force: false,
+    fixDefaultLocation: false,
   };
   let write = false;
   let sawDryRun = false;
@@ -60,6 +62,8 @@ function parseArgs(argv: string[]): CliOptions {
       options.linked = true;
     } else if (arg === "--force") {
       options.force = true;
+    } else if (arg === "--fix-default-location") {
+      options.fixDefaultLocation = true;
     } else if (arg === "--limit") {
       const parsed = Number(argv[i + 1]);
       if (!Number.isFinite(parsed) || parsed <= 0) {
@@ -108,6 +112,8 @@ Usage:
 --only-empty  Skip DJs that already have bio, image, country, city, genres, and links
 --slug        Only this slug. Repeat the flag to pass several.
 --force       Overwrite non-empty fields on auto-confident matches
+--fix-default-location
+              Replace Vienna/Austria only when the accepted profile is elsewhere
 `);
 }
 
@@ -129,6 +135,7 @@ export async function runSearchEnrichDjs(
     linked: options.linked,
     dryRun: options.dryRun,
     force: options.force,
+    fixDefaultLocation: options.fixDefaultLocation,
     outputDir,
   });
 

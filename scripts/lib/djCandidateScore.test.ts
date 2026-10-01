@@ -306,6 +306,128 @@ describe("scoreDjCandidate", () => {
     assert.equal(scored.reasons.includes("location_neighbour"), false);
     assert.equal(scored.reasons.includes("location_distant"), false);
   });
+
+  it("auto-accepts a single exact foreign name and does not hold it back for location", () => {
+    const cases = [
+      {
+        name: "CALYX",
+        city: "South London",
+        country: "United Kingdom",
+        profileUrl: "https://soundcloud.com/calyx",
+      },
+      {
+        name: "JUSTIN JAY",
+        city: "Los Angeles",
+        country: "United States",
+        profileUrl: "https://soundcloud.com/justinjay",
+      },
+      {
+        name: "KØ:LAB",
+        city: "Copenhagen",
+        country: "Denmark",
+        profileUrl: "https://soundcloud.com/kolab",
+      },
+    ];
+
+    for (const example of cases) {
+      const decision = decideDjCandidates([
+        scoreDjCandidate(
+          example.name,
+          candidate({
+            name: example.name,
+            city: example.city,
+            country: example.country,
+            followers: 40000,
+            genres: ["techno"],
+            profileUrl: example.profileUrl,
+            soundcloudUrl: example.profileUrl,
+          })
+        ),
+      ]);
+      assert.equal(decision.status, "auto", example.name);
+      assert.equal(decision.chosen?.nameTier, "exact", example.name);
+      assert.equal(decision.chosen?.candidate.country, example.country, example.name);
+    }
+  });
+
+  it("uses location only to rank two profiles that share a name", () => {
+    const scored = (city: string, country: string, url: string) =>
+      scoreDjCandidate(
+        "Calyx",
+        candidate({
+          name: "Calyx",
+          city,
+          country,
+          followers: 1000,
+          profileUrl: url,
+          soundcloudUrl: url,
+        })
+      );
+
+    const withAustria = decideDjCandidates([
+      scored("London", "United Kingdom", "https://soundcloud.com/calyx-uk"),
+      scored("Vienna", "Austria", "https://soundcloud.com/calyx-vienna"),
+      scored("Berlin", "Germany", "https://soundcloud.com/calyx-berlin"),
+    ]);
+    assert.equal(withAustria.status, "auto");
+    assert.equal(withAustria.chosen?.candidate.country, "Austria");
+    assert.ok(withAustria.chosen?.reasons.includes("location_austria"));
+
+    const neighbour = decideDjCandidates([
+      scored("London", "United Kingdom", "https://soundcloud.com/calyx-uk"),
+      scored("Vaduz", "Liechtenstein", "https://soundcloud.com/calyx-li"),
+    ]);
+    assert.equal(neighbour.status, "auto");
+    assert.equal(neighbour.chosen?.candidate.country, "Liechtenstein");
+    assert.ok(neighbour.chosen?.reasons.includes("location_neighbour"));
+  });
+
+  it("sends generic short names to review unless a SoundCloud link confirms them", () => {
+    for (const name of ["Izzy", "Soda", "Thea", "Ben", "Fra", "JOEY", "KAROLINA"]) {
+      const decision = decideDjCandidates(
+        [
+          scoreDjCandidate(
+            name,
+            candidate({
+              name,
+              country: "Austria",
+              city: "Vienna",
+              followers: 5000,
+              genres: ["techno"],
+              profileUrl: `https://soundcloud.com/${name.toLowerCase()}`,
+              soundcloudUrl: `https://soundcloud.com/${name.toLowerCase()}`,
+            })
+          ),
+        ],
+        name
+      );
+      assert.equal(decision.status, "review", name);
+      assert.equal(decision.chosen, null, name);
+    }
+
+    const anchored = decideDjCandidates(
+      [
+        scoreDjCandidate(
+          "Izzy",
+          candidate({
+            name: "Izzy",
+            country: "United Kingdom",
+            city: "London",
+            profileUrl: "https://soundcloud.com/izzy",
+            soundcloudUrl: "https://soundcloud.com/izzy",
+          }),
+          {
+            eventLink: false,
+            crossSoundcloud: true,
+            crossInstagram: false,
+            crossCountry: false,
+          }
+        ),
+      ],
+      "Izzy"
+    );
+    assert.equal(anchored.status, "auto");
+  });
 });
 
 describe("planDjFieldUpdates", () => {
@@ -406,6 +528,86 @@ describe("planDjFieldUpdates", () => {
 
     assert.equal(plan.updates.country, undefined);
     assert.equal(plan.updates.city, undefined);
+  });
+
+  it("does not write a junk SoundCloud city such as Tsunami", () => {
+    const plan = planDjFieldUpdates({
+      dj: emptyDj({ name: "TSUKI", slug: "tsuki" }),
+      soundcloud: candidate({
+        name: "TSUKI",
+        city: "Tsunami",
+        country: "Japan",
+        bio: "Tsuki.",
+        profileUrl: "https://soundcloud.com/tsuki",
+        soundcloudUrl: "https://soundcloud.com/tsuki",
+      }),
+      ra: null,
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(plan.updates.city, undefined);
+    assert.equal(plan.updates.country, "Japan");
+    assert.equal(plan.updates.bio, "Tsuki.");
+  });
+
+  it("leaves a non-empty city alone and only replaces a Vienna default when asked", () => {
+    const london = candidate({
+      name: "CALYX",
+      city: "South London",
+      country: "United Kingdom",
+      bio: "Drum and bass.",
+      profileUrl: "https://soundcloud.com/calyx",
+      soundcloudUrl: "https://soundcloud.com/calyx",
+    });
+    const viennaDefault = emptyDj({
+      name: "CALYX",
+      slug: "calyx",
+      city: "Vienna",
+      country: "Austria",
+      bio: "Keep this bio.",
+    });
+
+    const held = planDjFieldUpdates({
+      dj: viennaDefault,
+      soundcloud: london,
+      ra: null,
+      force: false,
+      columns: COLUMNS,
+    });
+    assert.equal(held.updates.city, undefined);
+    assert.equal(held.updates.country, undefined);
+    assert.equal(held.updates.bio, undefined);
+    assert.ok(held.skippedNonEmpty.includes("city"));
+    assert.ok(held.skippedNonEmpty.includes("bio"));
+
+    const replaced = planDjFieldUpdates({
+      dj: viennaDefault,
+      soundcloud: london,
+      ra: null,
+      force: false,
+      fixDefaultLocation: true,
+      columns: COLUMNS,
+    });
+    assert.equal(replaced.updates.city, "South London");
+    assert.equal(replaced.updates.country, "United Kingdom");
+    assert.equal(replaced.updates.bio, undefined);
+
+    const berlin = planDjFieldUpdates({
+      dj: emptyDj({
+        name: "CALYX",
+        slug: "calyx",
+        city: "Berlin",
+        country: "Germany",
+      }),
+      soundcloud: london,
+      ra: null,
+      force: false,
+      fixDefaultLocation: true,
+      columns: COLUMNS,
+    });
+    assert.equal(berlin.updates.city, undefined);
+    assert.equal(berlin.updates.country, undefined);
   });
 });
 
@@ -755,7 +957,7 @@ describe("matchDjProfiles", () => {
     assert.equal(result.updates.country, undefined);
   });
 
-  it("does not treat plays-in-Austria as corroboration for an RA profile with no home location", () => {
+  it("accepts a unique RA name with no home location and does not invent a country", () => {
     const result = matchDjProfiles({
       dj: emptyDj({ name: "Comrade Martin", slug: "comrade-martin" }),
       soundcloud: [],
@@ -777,9 +979,36 @@ describe("matchDjProfiles", () => {
       columns: COLUMNS,
     });
 
-    assert.equal(result.ra.status, "review");
+    assert.equal(result.ra.status, "auto");
+    assert.equal(result.raMerge, "applied");
     assert.equal(result.updates.country, undefined);
-    assert.deepEqual(result.updates, {});
+    assert.equal(result.updates.city, undefined);
+  });
+
+  it("accepts a generic name when the saved SoundCloud URL is the anchor", () => {
+    const result = matchDjProfiles({
+      dj: emptyDj({
+        name: "Izzy",
+        slug: "izzy",
+        soundcloud_url: "https://soundcloud.com/izzy",
+      }),
+      soundcloud: [
+        candidate({
+          name: "Izzy",
+          followers: 20,
+          bio: "Izzy.",
+          profileUrl: "https://soundcloud.com/izzy",
+          soundcloudUrl: "https://soundcloud.com/izzy",
+        }),
+      ],
+      ra: [],
+      evidence: { soundcloudUrls: [], instagramUrls: [] },
+      force: false,
+      columns: COLUMNS,
+    });
+
+    assert.equal(result.soundcloud.status, "auto");
+    assert.equal(result.updates.bio, "Izzy.");
   });
 
   it("keeps a Vienna RA-only profile in review when the margin is under 12", () => {

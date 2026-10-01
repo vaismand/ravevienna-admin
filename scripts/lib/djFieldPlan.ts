@@ -1,5 +1,11 @@
 import type { DjProfileCandidate } from "./djCandidateScore.ts";
-import { concreteLocation, normalizeCountryName } from "./countryNames.ts";
+import {
+  concreteLocation,
+  countryTier,
+  isJunkCityName,
+  isViennaCity,
+  normalizeCountryName,
+} from "./countryNames.ts";
 import { canonicalInstagramUrl, canonicalSoundCloudUrl } from "./profileLinks.ts";
 import { normalizeSpotifyGenres } from "./normalizeSpotifyGenres.ts";
 
@@ -67,12 +73,42 @@ function pushUnique(list: string[], value: string) {
   }
 }
 
+function isViennaAustriaDefault(dj: DjEnrichmentRow): boolean {
+  const city = typeof dj.raw.city === "string" ? dj.raw.city : dj.city;
+  const country = typeof dj.raw.country === "string" ? dj.raw.country : dj.country;
+  return isViennaCity(city) && normalizeCountryName(country) === "Austria";
+}
+
+function elsewhereLocation(
+  candidate: DjProfileCandidate | null,
+  artistName: string
+): { city: string | null; country: string } | null {
+  if (!candidate) {
+    return null;
+  }
+  const place = concreteLocation(candidate.city, candidate.country);
+  const country = normalizeCountryName(place.country);
+  if (!country) {
+    return null;
+  }
+  const city =
+    place.city && !isJunkCityName(place.city, artistName)
+      ? cleanText(place.city, 120)
+      : null;
+  if (countryTier(country, city) === "austria") {
+    return null;
+  }
+  return { city, country };
+}
+
 export function planDjFieldUpdates(input: {
   dj: DjEnrichmentRow;
   soundcloud: DjProfileCandidate | null;
   ra: DjProfileCandidate | null;
   force: boolean;
   columns: Set<string>;
+  /** Replace a Vienna/Austria default when the accepted profile is elsewhere. */
+  fixDefaultLocation?: boolean;
 }): FieldPlan {
   const { dj, soundcloud, ra, force, columns } = input;
   const updates: Record<string, unknown> = {};
@@ -100,10 +136,14 @@ export function planDjFieldUpdates(input: {
     proposed.set("bio", bio);
   }
 
+  const artistName = soundcloud?.name || ra?.name || dj.name;
   const soundcloudPlace = concreteLocation(soundcloud?.city, soundcloud?.country);
   const raPlace = concreteLocation(ra?.city, ra?.country);
 
-  const city = cleanText(soundcloudPlace.city, 120);
+  const city =
+    soundcloudPlace.city && !isJunkCityName(soundcloudPlace.city, artistName)
+      ? cleanText(soundcloudPlace.city, 120)
+      : null;
   if (city) {
     proposed.set("city", city);
   }
@@ -190,6 +230,26 @@ export function planDjFieldUpdates(input: {
 
     updates[column] = value;
     filled.push(column);
+  }
+
+  if (input.fixDefaultLocation && isViennaAustriaDefault(dj)) {
+    const elsewhere =
+      elsewhereLocation(soundcloud, artistName) ?? elsewhereLocation(ra, artistName);
+    if (elsewhere) {
+      for (const column of ["city", "country"] as const) {
+        if (!columns.has(column)) {
+          pushUnique(skippedMissingColumn, column);
+          continue;
+        }
+        const value = column === "city" ? elsewhere.city : elsewhere.country;
+        const skipAt = skippedNonEmpty.indexOf(column);
+        if (skipAt >= 0) {
+          skippedNonEmpty.splice(skipAt, 1);
+        }
+        updates[column] = value;
+        pushUnique(filled, column);
+      }
+    }
   }
 
   if (Object.keys(updates).length > 0 && columns.has("updated_at")) {

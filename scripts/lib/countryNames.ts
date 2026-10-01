@@ -37,6 +37,9 @@ const ALIASES: Record<string, string> = {
   svn: "Slovenia",
   slovenia: "Slovenia",
   slowenien: "Slovenia",
+  li: "Liechtenstein",
+  lie: "Liechtenstein",
+  liechtenstein: "Liechtenstein",
   it: "Italy",
   ita: "Italy",
   italy: "Italy",
@@ -76,6 +79,29 @@ const NEIGHBOURS = new Set([
   "Hungary",
   "Slovenia",
   "Italy",
+  "Liechtenstein",
+]);
+
+/** SoundCloud city strings that are not places. "Tsunami" must not be stored. */
+const JUNK_CITY_WORDS = new Set([
+  "tsunami",
+  "earth",
+  "internet",
+  "online",
+  "moon",
+  "mars",
+  "space",
+  "hell",
+  "heaven",
+  "universe",
+  "everywhere",
+  "nowhere",
+  "home",
+  "world",
+  "cyberspace",
+  "metaverse",
+  "underground",
+  "secret",
 ]);
 
 const regionDisplay = new Intl.DisplayNames(["en"], { type: "region" });
@@ -160,6 +186,38 @@ export function concreteLocation(
     city: city?.trim() || null,
     country: isVaguePlaceName(country) ? null : country?.trim() || null,
   };
+}
+
+function foldPlace(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Non-places and cities that just repeat the artist name.
+ * A junk city is not written and cannot replace the Vienna default.
+ */
+export function isJunkCityName(
+  city: string | null | undefined,
+  artistName?: string | null
+): boolean {
+  if (!city?.trim() || isVaguePlaceName(city)) {
+    return Boolean(city?.trim());
+  }
+  const folded = foldPlace(city);
+  if (!folded || JUNK_CITY_WORDS.has(folded)) {
+    return true;
+  }
+  if (!artistName?.trim()) {
+    return false;
+  }
+  const artist = foldPlace(artistName).replace(/ /g, "");
+  const compactCity = folded.replace(/ /g, "");
+  return Boolean(artist && compactCity && artist === compactCity);
 }
 
 export function isViennaCity(city: string | null | undefined): boolean {
