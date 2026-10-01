@@ -14,7 +14,7 @@ import { useNotification } from '../../context/NotificationContext';
 import { useDraftEvents } from '../../hooks/useDraftEvents';
 import { useReferenceData } from '../../hooks/useReferenceData';
 import { useScriptRunner } from '../../hooks/useScriptRunner';
-import { syncEventDjsForDraft, updateEventDjs } from '../../lib/eventDjActions';
+import { syncEventDjsForDraft } from '../../lib/eventDjActions';
 import {
   formatDraftApproveMessage,
   formatDraftPublishMessage,
@@ -213,7 +213,7 @@ export function DraftEventsPage() {
     });
   };
 
-  const handlePublish = async (data: DraftEventFormData, djIds: string[]) => {
+  const handlePublish = async (data: DraftEventFormData) => {
     if (!editingEvent) return;
     await runWithBusy(async () => {
       await saveDraftEvent(editingEvent.id, data);
@@ -221,8 +221,7 @@ export function DraftEventsPage() {
         ...editingEvent,
         ...formDataToUpdatePayload(data),
       };
-      const { eventId, djs } = await publishDraftEvent(merged);
-      await updateEventDjs(eventId, djIds);
+      const { djs } = await publishDraftEvent(merged);
       notify(formatDraftPublishMessage(1, djs), 'success');
       await refreshAfterAction();
     });
