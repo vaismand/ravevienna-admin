@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build && npm run build:scripts",
     "build:scripts": "tsx scripts/bundle-server-scripts.ts",
     "lint": "eslint .",
-    "test": "node --import tsx --test scripts/publishDraft.test.ts",
+    "test": "node --import tsx --test scripts/publishDraft.test.ts scripts/lib/*.test.ts",
     "preview": "vite preview",
     "scrape": "tsx scripts/entries/scrape.entry.ts",
     "scrape:restore-drafts": "tsx scraper/scripts/restorePublishedDrafts.ts",
@@ -17,7 +17,8 @@
     "enrich:dj:ra": "tsx scripts/entries/enrich-ra.entry.ts",
     "enrich:dj:soundcloud": "tsx scripts/entries/enrich-soundcloud.entry.ts",
     "enrich:djs:soundcloud": "tsx scripts/enrichDjsFromSoundCloud.ts",
-    "search:enrich:dj:soundcloud": "tsx scripts/entries/search-enrich-soundcloud.entry.ts"
+    "search:enrich:dj:soundcloud": "tsx scripts/entries/search-enrich-soundcloud.entry.ts",
+    "search:enrich:djs": "tsx scripts/entries/search-enrich-djs.entry.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.0",

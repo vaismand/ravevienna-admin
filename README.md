@@ -79,9 +79,12 @@ npm run scrape:restore-drafts         # fix draft status after bad scrape run
 npm run scrape:publish-approved       # publish approved drafts to events
 npm run enrich:djs -- --dry-run       # Spotify enrichment (bulk)
 npm run enrich:dj:ra -- --url "…" --name "…" --dry-run   # RA enrichment (single DJ)
+npm run search:enrich:djs -- --dry-run --limit 10       # SoundCloud + RA search (preview)
 ```
 
-See [docs/enrich-dj-ra.md](docs/enrich-dj-ra.md) for RA enrichment details.
+`search:enrich:djs` looks up each DJ on SoundCloud (public API v2, no login) and Resident Advisor. A dry run is the default and writes `scripts/output/dj-search-enrich.json` plus `.md`. It does not update the database. Pass `--write` to apply only auto-confident matches; ambiguous names stay in the review section. `--force` is required to replace fields that already have a value. `--active --linked` limits the run to active DJs that are on events, highest event count first. `--slug` and `--only-empty` limit the run further. A saved `soundcloud_url` is fetched directly and treated as that DJ's SoundCloud account; a different account is not chosen. A single exact non-generic name is accepted even when the profile is outside Austria. Location (Austria, then neighbours including Liechtenstein, then elsewhere) only ranks similar names. Short names, common first names, and ordinary words stay in review unless a saved SoundCloud URL or a SoundCloud/RA link agrees. `--only-empty` writes only empty fields, including when `--force` is also set. `--fix-default-location` proposes replacing a Vienna/Austria default when the accepted profile has a real city somewhere else. A junk or missing city, such as `Tsunami`, does not clear Vienna or change the country. Nothing is replaced unless that flag is set.
+
+See [docs/enrich-dj-ra.md](docs/enrich-dj-ra.md) for single-URL RA enrichment.
 
 ## Database tables used
 
