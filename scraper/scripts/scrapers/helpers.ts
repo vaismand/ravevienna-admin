@@ -1,5 +1,4 @@
 import axios from "axios";
-import * as cheerio from "cheerio";
 
 import {
   detectGenresFromText,
@@ -114,45 +113,50 @@ function textHasKeyword(text: string, keyword: string): boolean {
   return pattern.test(text);
 }
 
+const HARD_REJECT_KEYWORDS = [
+  "gregor hägele",
+  "gregor haegele",
+  "nervy",
+  "krs-one",
+  "set it off",
+  "audio88",
+  "yassin",
+  "i killed the prom queen",
+  "touché amor",
+  "touche amor",
+  "immortal disfigurement",
+  "gutrectomy",
+  "don broco",
+  "hands like houses",
+  "broadside",
+  "destroy boys",
+  "drowning pool",
+  "don west",
+  "lance butters",
+  "sampagne",
+  "yami safdie",
+  "neunundneunzig",
+  "concert",
+  "tour",
+  "band",
+  "rock",
+  "metal",
+  "hip-hop",
+  "hip hop",
+  "rap",
+  "live concert",
+];
+
+/** Named concerts and other non-club bills. Shared by the keyword filter and Das Werk. */
+export function hasHardRejectKeywords(text: string): boolean {
+  return HARD_REJECT_KEYWORDS.some((keyword) => textHasKeyword(text, keyword));
+}
+
 export function isRelevantRaveEvent(event: ScrapedEvent): boolean {
   const text = `${event.title} ${event.description ?? ""} ${event.genres.join(" ")}`
     .toLowerCase();
 
-  const hardRejectKeywords = [
-    "gregor hägele",
-    "gregor haegele",
-    "nervy",
-    "krs-one",
-    "set it off",
-    "audio88",
-    "yassin",
-    "i killed the prom queen",
-    "touché amor",
-    "touche amor",
-    "immortal disfigurement",
-    "gutrectomy",
-    "don broco",
-    "hands like houses",
-    "broadside",
-    "destroy boys",
-    "drowning pool",
-    "don west",
-    "lance butters",
-    "sampagne",
-    "yami safdie",
-    "neunundneunzig",
-    "concert",
-    "tour",
-    "band",
-    "rock",
-    "metal",
-    "hip-hop",
-    "hip hop",
-    "rap",
-    "live concert",
-  ];
-
-  if (hardRejectKeywords.some((keyword) => textHasKeyword(text, keyword))) {
+  if (hasHardRejectKeywords(text)) {
     return false;
   }
 

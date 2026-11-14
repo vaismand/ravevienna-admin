@@ -271,6 +271,23 @@ describe("publish payload conversion", () => {
     assert.deepEqual(lineupToTextArray('["A","B"]'), ["A", "B"]);
   });
 
+  it("keeps [room] stage markers in the stored lineup", () => {
+    assert.deepEqual(
+      lineupToTextArray([
+        "[MAINFLOOR]",
+        "Altinbas",
+        "Rantom b2b SODA",
+        "[KITCHEN hosted by LuvAffair]",
+      ]),
+      [
+        "[MAINFLOOR]",
+        "Altinbas",
+        "Rantom b2b SODA",
+        "[KITCHEN hosted by LuvAffair]",
+      ],
+    );
+  });
+
   it("normalizes numeric and string prices", () => {
     assert.equal(normalizeEventPrice(12.5), 12.5);
     assert.equal(normalizeEventPrice("€15,00"), 15);
@@ -391,6 +408,11 @@ describe("publishDraftRecord", () => {
       ["Annakonda", "Stendhal Syndrome"],
     );
     assert.deepEqual(linkedNames(db), ["Annakonda", "Stendhal Syndrome"]);
+    assert.deepEqual(rows(db, "events")[0]?.lineup, [
+      "[MAINFLOOR]",
+      "Annakonda B2B Stendhal Syndrome",
+      "KITCHEN Hosted By Bassbussi",
+    ]);
   });
 
   it("keeps existing event_djs when the lineup resolves no DJs", async () => {

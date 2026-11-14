@@ -25,7 +25,10 @@ export function genresJsonToTextArray(genres: unknown): string[] {
   return result;
 }
 
-/** Lineup is one plain DJ name per array element. */
+/**
+ * Lineup is one stored row per array element.
+ * `[MAINFLOOR]`-style stage markers stay in the array; DJ import skips them later.
+ */
 export function lineupToTextArray(lineup: unknown): string[] {
   if (lineup == null) return [];
 
