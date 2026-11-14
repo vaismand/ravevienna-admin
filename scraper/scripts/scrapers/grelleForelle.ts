@@ -10,6 +10,7 @@ import {
   parsePrice,
   sleep,
 } from "./helpers";
+import { htmlToStructuredText } from "./lineup";
 import type { ScrapedEvent, ScrapeSource } from "./types";
 
 async function enrichFromTicketIoPage(ticketUrl: string | null): Promise<{
@@ -63,9 +64,14 @@ async function enrichFromTicketIoPage(ticketUrl: string | null): Promise<{
       description: structuredDescription,
       image_url: structuredImage,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const responseStatus =
+      typeof error === "object" && error && "response" in error
+        ? (error as { response?: { status?: number } }).response?.status
+        : undefined;
+    const message = error instanceof Error ? error.message : String(error);
     console.log(`Could not enrich from ticket.io page: ${ticketUrl}`);
-    console.log(error.response?.status ?? error.message);
+    console.log(responseStatus ?? message);
     return null;
   }
 }
@@ -129,11 +135,13 @@ async function scrapeGrelleForelleEventPage(
     return null;
   }
 
-  const contentText = cleanText(
-    $(".entry-content").first().text() ||
-      $("article").first().text() ||
-      $("body").text()
-  );
+  const contentHtml =
+    $(".entry-content").first().html() ||
+    $("article").first().html() ||
+    "";
+  const contentText = contentHtml
+    ? htmlToStructuredText(contentHtml)
+    : cleanText($("body").text());
 
   const imageUrl =
     $(".et_pb_image img").first().attr("src") ||

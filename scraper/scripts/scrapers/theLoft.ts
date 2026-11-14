@@ -141,6 +141,29 @@ function isRelevantLoftEvent(event: {
   return (startsLikeClubNight || afterparty) && hasElectronicKeyword && !obviousNotRelevant;
 }
 
+/**
+ * Detail pages list each DJ under a floor, e.g.
+ * "Oben: A b2b B, C. Unten: D". The listing card only names the rooms.
+ */
+function loftPerDjFloors($: cheerio.CheerioAPI): string | null {
+  const seen = new Set<string>();
+  const candidates: string[] = [];
+
+  $(".elementor-widget-text-editor").each((_, el) => {
+    const text = cleanText($(el).text())
+      .replace(/^lineup\s*:\s*/i, "")
+      .trim();
+    if (!text || !/\b(?:oben|unten|wohnzimmer)\s*:/i.test(text)) return;
+
+    const key = text.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push(text);
+  });
+
+  return candidates.sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
 function extractEventLink($: cheerio.CheerioAPI) {
   return (
     $("a.elementor-button")
@@ -171,10 +194,14 @@ async function scrapeLoftDetail(eventUrl: string) {
     cleanText($("h1.elementor-heading-title").first().text()) ||
     cleanText(($("meta[property='og:title']").attr("content") ?? "").replace("@ The Loft", ""));
 
-  const description =
+  const floorLineup = loftPerDjFloors($);
+  const descriptionBody =
     cleanText($(".party-inhalt").first().text()) ||
     cleanText(jsonLd?.description ?? "") ||
     cleanText($("meta[property='og:description']").attr("content") ?? "");
+  const description = [descriptionBody, floorLineup ? `Lineup:\n${floorLineup}` : ""]
+    .filter(Boolean)
+    .join("\n\n");
 
   const image =
     absoluteUrl(

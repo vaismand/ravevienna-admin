@@ -1,4 +1,4 @@
-import { isLineupFloorLabel, splitLineupCollaborations } from "../../../scripts/lib/lineupArtists.ts";
+import { isLineupFloorLabel } from "../../../scripts/lib/lineupArtists.ts";
 
 const LINEUP_HEADER_REGEX =
   /^(?:line[\s-]?up|artists?|djs?|acts?|with|w\/)\s*:?\s*$/i;
@@ -41,7 +41,7 @@ function htmlToTextWithNewlines(raw: string): string {
       .replace(/\\r/g, "\n")
       .replace(/\r\n/g, "\n")
       .replace(/\r/g, "\n")
-      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<br\b[^>]*>/gi, "\n")
       .replace(/<\/p>/gi, "\n")
       .replace(/<\/div>/gi, "\n")
       .replace(/<\/li>/gi, "\n")
@@ -70,65 +70,175 @@ function prepareTextForLineup(raw: string): string {
 }
 
 function isLineupHeaderLine(line: string): boolean {
-  const clean = normalizeSpaces(line.replace(/^[-–—•·*]+\s*/, ""));
-  return LINEUP_HEADER_REGEX.test(clean);
+  const clean = stripDecorations(normalizeSpaces(line));
+  if (!clean) return false;
+  if (LINEUP_HEADER_REGEX.test(clean)) return true;
+  if (/^line[\s-]?up\b(?:\s*\([^)]*\))?\s*:?\s*$/i.test(clean)) return true;
+  if (/^[^a-z0-9]*line[\s-]?up[^a-z0-9]*$/i.test(clean)) return true;
+  return false;
 }
 
-function isValidArtistName(name: string): boolean {
-  const clean = normalizeSpaces(
-    name.replace(/^[-–—•·*]+\s*/, "").replace(/^:+/, "")
-  );
+const ROOM_CORE =
+  "main\\s*floor|mainfloor|laster\\s*floor|luster\\s*floor|second\\s*floor|kitchen(?:\\s+hosted\\s+by\\s+\\S+)?|oben|unten|wohnzimmer";
 
-  if (!clean) return false;
-  if (isLineupFloorLabel(clean)) return false;
-  if (clean.length < MIN_ARTIST_LENGTH || clean.length > MAX_ARTIST_LENGTH) {
-    return false;
+function stripDecorations(value: string): string {
+  return value
+    .replace(/[\p{Extended_Pictographic}\p{So}\uFE0F\u200D]/gu, " ")
+    .replace(/[▶►➔➤▸▹▼▲●○■□◆◇★☆✓✔✕✖╪╱╲•·▪‣]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Bracket a room/floor header the way the app's stage markers expect. */
+export function formatRoomTag(label: string): string {
+  const clean = stripDecorations(label).replace(/[:|]+$/g, "").trim();
+  const hosted = clean.match(/^(.*\S)\s+(hosted\s+by\s+.+)$/i);
+  if (hosted?.[1] && hosted[2]) {
+    return `[${hosted[1].toUpperCase()} ${hosted[2]}]`;
   }
+  return `[${clean.toUpperCase()}]`;
+}
 
-  const lowered = clean.toLowerCase();
-  if (NON_ARTIST_LABELS.has(lowered)) return false;
-  if (/^line[\s-]?up$/i.test(clean)) return false;
+function isStopLine(line: string): boolean {
+  const clean = stripDecorations(line);
+  if (!clean) return false;
+  if (
+    /^(?:tickets?|doors?|entry|admission|presale|pre[\s-]*sale|box office|location|venue|address|awareness|hardfacts|no place|no photo|respect the club|earlybird|limited pre|stay hard|(?:graphics|visuals|photos?)\s+by)\b/i.test(
+      clean
+    )
+  ) {
+    return true;
+  }
+  if (/^(?:das werk|daswerk)\b/i.test(clean)) return true;
+  if (/^\d{1,2}[:.]\d{2}/.test(clean)) return true;
+  if (/^\d{1,2}\.\d{1,2}\.\d{2,4}\b/.test(clean)) return true;
+  if (/[€]/.test(clean) && !/\bb2b\b/i.test(clean)) return true;
+  return false;
+}
 
-  if (/^https?:\/\//i.test(clean)) return false;
-  if (/^\d+$/.test(clean)) return false;
-
+function isLongProse(line: string): boolean {
+  const words = stripDecorations(line).split(/\s+/).filter(Boolean);
+  if (words.length < 7) return false;
+  if (/\bb2b\b|\bf2f\b/i.test(line)) return false;
   return true;
 }
 
-function splitCamelCaseArtists(text: string): string[] {
-  return text
-    .split(/(?<=[a-zà-öø-ÿ0-9])(?=[A-ZÀ-ÖØ-Þ])/)
-    .map((part) => normalizeSpaces(part))
-    .filter(isValidArtistName);
+function proseRoomLabel(line: string): string | null {
+  const clean = stripDecorations(line);
+  if (!clean.endsWith(":")) return null;
+  if (/^line[\s-]?up\b/i.test(clean)) return null;
+  if (new RegExp(`^(?:${ROOM_CORE})\\s*:$`, "i").test(clean)) return null;
+  if (clean.split(/\s+/).length < 5) return null;
+  const match = clean.match(new RegExp(`\\b(${ROOM_CORE})\\b`, "i"));
+  return match?.[1] ?? null;
 }
 
-function splitArtistChunk(chunk: string): string[] {
-  const clean = normalizeSpaces(chunk.replace(/^[-–—•·*]+\s*/, ""));
-  if (!clean) return [];
+function splitByRoomMarkers(
+  line: string
+): { room: string; body: string }[] | null {
+  const re = new RegExp(`(?:^|\\.\\s*)(${ROOM_CORE})\\s*:?`, "giu");
+  const matches = [...line.matchAll(re)].filter((match) => {
+    const at = match.index ?? 0;
+    const hasColon = /:\s*$/.test(match[0] ?? "");
+    if (at > 0 && !hasColon) return false;
+    // A room word with no colon is only a header when it fills the line.
+    if (!hasColon && line.slice(at + (match[0]?.length ?? 0)).trim()) {
+      return false;
+    }
+    return Boolean(match[1]);
+  });
 
-  const collaborations = splitLineupCollaborations(clean);
-  if (collaborations.length > 1) {
-    return collaborations.flatMap((part) => splitArtistChunk(part));
+  if (matches.length === 0) return null;
+
+  return matches.map((match, index) => {
+    const start = (match.index ?? 0) + (match[0]?.length ?? 0);
+    const end =
+      index + 1 < matches.length
+        ? (matches[index + 1]?.index ?? line.length)
+        : line.length;
+    return {
+      room: match[1] ?? "",
+      body: line.slice(start, end).replace(/[.\s]+$/g, "").trim(),
+    };
+  });
+}
+
+function cleanArtistToken(value: string): string | null {
+  const cut = value.split(
+    /\b(?:entry|doors?|box\s+office|pre[\s-]*sale|presale|tickets?)\b/i
+  )[0] ?? "";
+
+  const name = stripDecorations(cut)
+    .replace(/@[A-Za-z0-9._]+/g, " ")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/\s+w\/\s*$/i, "")
+    .replace(/^[\s\-–—*|:;/\\]+/, "")
+    .replace(/[\s|:/\\.,]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!name) return null;
+  if (isLineupFloorLabel(name)) return null;
+  if (name.startsWith("[") && name.endsWith("]")) return name;
+  if (name.length < MIN_ARTIST_LENGTH || name.length > MAX_ARTIST_LENGTH) {
+    return null;
   }
 
-  const byDelimiters = clean
-    .split(/\n+|[,;|•·]+|\s\/\s+|\s\\\s+/)
-    .map((part) => normalizeSpaces(part))
-    .filter(Boolean);
+  const lowered = name.toLowerCase();
+  const compact = lowered.replace(/[.\s]/g, "");
+  if (NON_ARTIST_LABELS.has(lowered) || NON_ARTIST_LABELS.has(compact)) {
+    return null;
+  }
+  if (/^line[\s-]?up$/i.test(name)) return null;
+  if (/^\(?a\s*-\s*z\)?:?$/i.test(name)) return null;
+  if (/^https?:\/\//i.test(name)) return null;
+  if (/^\d+$/.test(name)) return null;
+  if (/^\d{1,2}[:.]\d{2}/.test(name)) return null;
+  if (!/\p{L}/u.test(name)) return null;
 
-  if (byDelimiters.length > 1) {
-    return byDelimiters.flatMap((part) => {
-      const camel = splitCamelCaseArtists(part);
-      return camel.length > 0 ? camel : isValidArtistName(part) ? [part] : [];
-    });
+  return name;
+}
+
+function splitArtists(body: string): { names: string[]; stopped: boolean } {
+  const stopped = /\b(?:entry|doors?|box\s+office|pre[\s-]*sale|presale|tickets?)\b/i.test(
+    body
+  );
+  const names = body
+    .split(/\n+|[,;•·|]+|\s*\/\/\s*/)
+    .map((part) => cleanArtistToken(part))
+    .filter((name): name is string => Boolean(name));
+
+  return { names, stopped };
+}
+
+function consumeLine(line: string, into: string[]): "stop" | "ok" {
+  const clean = stripDecorations(line);
+  if (!clean) return "ok";
+  if (isStopLine(clean)) return "stop";
+
+  const proseRoom = proseRoomLabel(clean);
+  if (proseRoom) {
+    into.push(formatRoomTag(proseRoom));
+    return "ok";
   }
 
-  const camel = splitCamelCaseArtists(clean);
-  if (camel.length > 1) {
-    return camel;
+  const rooms = splitByRoomMarkers(clean);
+  if (rooms) {
+    let stopped = false;
+    for (const room of rooms) {
+      if (room.room) into.push(formatRoomTag(room.room));
+      const artists = splitArtists(room.body);
+      into.push(...artists.names);
+      if (artists.stopped) stopped = true;
+    }
+    return stopped ? "stop" : "ok";
   }
 
-  return isValidArtistName(clean) ? [clean] : [];
+  if (isLongProse(clean)) return "stop";
+
+  const artists = splitArtists(clean);
+  into.push(...artists.names);
+  return artists.stopped ? "stop" : "ok";
 }
 
 function dedupeArtists(artists: string[]): string[] {
@@ -215,36 +325,26 @@ function splitInlineHeaderLine(line: string): {
 function collectLineupFromLines(lines: string[], startIndex: number): string[] {
   const artists: string[] = [];
   const headerLine = normalizeSpaces(lines[startIndex] ?? "");
-  const inlineHeader = splitInlineHeaderLine(headerLine);
+  let index = startIndex;
 
-  if (inlineHeader.remainder) {
-    artists.push(...splitArtistChunk(inlineHeader.remainder));
+  if (isLineupHeaderLine(headerLine)) {
+    const inlineHeader = splitInlineHeaderLine(headerLine);
+    if (inlineHeader.isHeader && inlineHeader.remainder) {
+      const status = consumeLine(inlineHeader.remainder, artists);
+      if (status === "stop") return dedupeArtists(artists);
+    }
+    index = startIndex + 1;
   }
 
-  let index = startIndex + 1;
-
   while (index < lines.length) {
-    const line = normalizeSpaces(lines[index]);
-
-    if (!line) {
-      index += 1;
-      continue;
-    }
-
-    if (isLineupHeaderLine(line)) {
-      break;
-    }
-
-    if (
-      /^(tickets?|doors?|entry|admission|presale|location|venue|address)\b/i.test(
-        line
-      )
-    ) {
-      break;
-    }
-
-    artists.push(...splitArtistChunk(line));
+    const line = normalizeSpaces(lines[index] ?? "");
     index += 1;
+
+    if (!line) continue;
+    if (isLineupHeaderLine(line)) break;
+
+    const status = consumeLine(line, artists);
+    if (status === "stop") break;
   }
 
   return dedupeArtists(artists);
@@ -253,15 +353,41 @@ function collectLineupFromLines(lines: string[], startIndex: number): string[] {
 /**
  * Extract artist names from a lineup section inside event description text.
  */
+/**
+ * Turn event HTML into text that keeps lineup rows on their own lines.
+ * `<br>` between DJs must survive; collapsing them glues room names onto artists.
+ */
+export function htmlToStructuredText(raw: string): string {
+  return prepareTextForLineup(raw)
+    .split("\n")
+    .map((line) => normalizeSpaces(line))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * Extract lineup rows from event text.
+ * Room/floor headers are kept as `[MAINFLOOR]`-style stage markers.
+ * A `b2b` / `f2f` set the source wrote as one line stays one element.
+ */
 export function extractLineup(description: string): string[] {
   if (!description?.trim()) {
     return [];
   }
 
-  const prepared = prepareTextForLineup(description);
+  const prepared = prepareTextForLineup(
+    description.replace(/\\r/g, "\n").replace(/\\n/g, "\n")
+  );
   const lines = prepared.split("\n").map((line) => line.trim());
 
-  const startIndex = findLineupStartIndex(lines);
+  let startIndex = findLineupStartIndex(lines);
+  if (startIndex === -1) {
+    startIndex = lines.findIndex((line) => {
+      const clean = stripDecorations(line);
+      return Boolean(splitByRoomMarkers(clean) || proseRoomLabel(clean));
+    });
+  }
   if (startIndex === -1) {
     return [];
   }
