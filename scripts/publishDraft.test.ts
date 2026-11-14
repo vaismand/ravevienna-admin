@@ -226,6 +226,7 @@ function draft(overrides: Partial<DraftEvent> = {}): DraftEvent {
     event_date: "2026-10-02",
     start_time: "23:00",
     price: "15",
+    sold_out: false,
     genres: ["Techno", "Electronic"],
     description: "Night",
     lineup: ["Alice", "Bob", "Alice"],
@@ -308,6 +309,7 @@ describe("publishDraftRecord", () => {
     assert.equal(events[0]?.id, eventId);
     assert.equal(events[0]?.draft_event_id, "draft-1");
     assert.equal(events[0]?.price, 15);
+    assert.equal(events[0]?.sold_out, false);
     assert.deepEqual(events[0]?.genres, ["Techno", "Electronic"]);
     assert.deepEqual(events[0]?.lineup, ["Alice", "Bob", "Alice"]);
 
@@ -333,6 +335,21 @@ describe("publishDraftRecord", () => {
     );
 
     assert.equal(rows(db, "draft_events")[0]?.status, "published");
+  });
+
+  it("copies sold_out from the draft onto the published event", async () => {
+    const { db, client } = createDb();
+    db.set("draft_events", [{ id: "draft-1", status: "approved" }]);
+
+    await publishDraftRecord(client, draft({ sold_out: true }));
+    assert.equal(rows(db, "events")[0]?.sold_out, true);
+
+    await publishDraftRecord(
+      client,
+      draft({ sold_out: false, status: "published" }),
+    );
+    assert.equal(rows(db, "events")[0]?.sold_out, false);
+    assert.equal(rows(db, "events").length, 1);
   });
 
   it("re-publishes without duplicating DJs or event_djs", async () => {

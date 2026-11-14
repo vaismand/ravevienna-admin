@@ -40,6 +40,7 @@ export interface DraftEvent {
   event_date: string | null;
   start_time: string | null;
   price: number | string | null;
+  sold_out: boolean;
   genres: string[] | null;
   description: string | null;
   lineup: string[] | null;
@@ -62,6 +63,7 @@ export interface Event {
   event_date: string | null;
   start_time: string | null;
   price: number | string | null;
+  sold_out?: boolean;
   genres: string[] | null;
   description: string | null;
   lineup?: string[] | null;
@@ -80,6 +82,7 @@ export interface DraftEventFormData {
   event_date: string;
   start_time: string;
   price: string;
+  sold_out: boolean;
   genres: string[];
   description: string;
   lineup: string;

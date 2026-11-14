@@ -3,6 +3,8 @@ export type ScrapedEvent = {
   event_date: string | null;
   start_time: string | null;
   price: number | null;
+  /** Shop or schema.org status. Omitted means not sold out. */
+  sold_out?: boolean;
   genres: string[];
   description: string | null;
   ticket_url: string | null;

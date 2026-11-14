@@ -108,6 +108,15 @@ export function DraftEventFormFields({
         />
       </label>
 
+      <label className={styles.toggleRow}>
+        <input
+          type="checkbox"
+          checked={form.sold_out}
+          onChange={(e) => update('sold_out', e.target.checked)}
+        />
+        <span>Sold out</span>
+      </label>
+
       <div className={styles.field}>
         <span className={styles.label}>Genres</span>
         <GenreMultiSelect

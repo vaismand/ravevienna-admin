@@ -42,14 +42,48 @@ export function cleanText(value: string): string {
     .trim();
 }
 
+const SOLD_OUT_PHRASE = /sold[\s-]?out|ausverkauft|out of stock/i;
+
+export function mentionsSoldOut(text: string): boolean {
+  return SOLD_OUT_PHRASE.test(text);
+}
+
+/**
+ * True for a ticket-status label such as "Ausverkauft" or "15 € sold out".
+ * A sentence that only mentions a sold-out sign is not a status.
+ */
+export function priceTextMarksSoldOut(text: string | null | undefined): boolean {
+  if (!text) return false;
+
+  const value = cleanText(text).toLowerCase();
+  if (!value || !mentionsSoldOut(value)) return false;
+
+  const leftover = value
+    .replace(/sold[\s-]?out/g, " ")
+    .replace(/ausverkauft/g, " ")
+    .replace(/out of stock/g, " ")
+    .replace(/\d+(?:[.,]\d+)?/g, " ")
+    .replace(/€/g, " ")
+    .replace(/[^a-zäöüß]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return leftover.length === 0;
+}
+
 export function parsePrice(text: string | null): number | null {
   if (!text) return null;
 
   const match = text.match(/(\d{1,3})\s*€/);
-
   if (!match) return null;
 
-  return Number(match[1]);
+  const value = Number(match[1]);
+  if (!Number.isFinite(value)) return null;
+
+  // "sold out" / "ausverkauft" must not be stored as free.
+  if (value === 0 && mentionsSoldOut(text)) return null;
+
+  return value;
 }
 
 export function parseEuropeanPrice(value: string): number | null {

@@ -1,6 +1,15 @@
 import * as cheerio from "cheerio";
 
-import { cleanText, guessGenres, http, parsePrice, sleep } from "./helpers";
+import {
+  cleanText,
+  guessGenres,
+  http,
+  mentionsSoldOut,
+  parsePrice,
+  priceTextMarksSoldOut,
+  sleep,
+} from "./helpers";
+import { readJsonLdOfferSummary } from "./ticketOffers";
 import type { ScrapedEvent, ScrapeSource } from "./types";
 
 const BASE_URL = "https://www.theloft.at";
@@ -49,7 +58,7 @@ function extractLoftPriceAmounts(text: string): number[] {
   return amounts;
 }
 
-function normalizeLoftPrice(text: string | null | undefined): string | null {
+export function normalizeLoftPrice(text: string | null | undefined): string | null {
   if (!text) return null;
 
   const value = cleanText(text);
@@ -57,8 +66,14 @@ function normalizeLoftPrice(text: string | null | undefined): string | null {
 
   const lower = value.toLowerCase();
 
+  if (mentionsSoldOut(lower)) {
+    const amounts = extractLoftPriceAmounts(value).filter((amount) => amount > 0);
+    if (amounts.length === 0) return null;
+    return `${Math.min(...amounts)} €`;
+  }
+
   if (lower.includes("freie spende") || lower.includes("freiwillige spende")) {
-    return null;
+    return "0 €";
   }
 
   if (/\bfrei\b/.test(lower)) {
@@ -218,6 +233,7 @@ async function scrapeLoftDetail(eventUrl: string) {
   const detailText = `${title} ${description} ${tags.join(" ")}`;
   const genres = guessGenres(detailText);
   const ticketUrl = absoluteUrl(extractEventLink($));
+  const soldOut = readJsonLdOfferSummary(jsonLd?.offers).soldOut;
 
   return {
     title,
@@ -226,6 +242,7 @@ async function scrapeLoftDetail(eventUrl: string) {
     genres,
     tags,
     ticketUrl,
+    soldOut,
   };
 }
 
@@ -292,6 +309,8 @@ export async function scrapeTheLoft(source: ScrapeSource): Promise<ScrapedEvent[
         price:
           parsePrice(normalizeLoftPrice(listingEvent.priceText)) ??
           parsePrice(normalizeLoftPrice(detail.description)),
+        sold_out:
+          priceTextMarksSoldOut(listingEvent.priceText) || detail.soldOut,
         genres: [...new Set(finalGenres)],
         description: detail.description || null,
         ticket_url: detail.ticketUrl,

@@ -102,6 +102,7 @@ export function buildPublishedEventPayload(draft: DraftEvent) {
     event_date: draft.event_date,
     start_time: draft.start_time,
     price: normalizeEventPrice(draft.price),
+    sold_out: draft.sold_out === true,
     genres: genresJsonToTextArray(draft.genres),
     description: draft.description,
     lineup: lineupToTextArray(draft.lineup),
