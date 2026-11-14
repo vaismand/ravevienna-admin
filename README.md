@@ -8,7 +8,7 @@ Web admin panel for reviewing scraped event data before it goes live in the Rave
 - Two review queues: **Scraped drafts** (`draft_events`) and **User submissions** (`event_submissions`)
 - Browse each by status: **Pending**, **Approved**, **Rejected**, **Published** (upcoming), **Passed** (past published events by date)
 - Filter by venue, genre, source, and search
-- Edit draft fields (title, venue, date, genres, URLs, etc.)
+- Edit draft fields (title, venue, date, genres, ticket and TicketSwap URLs, etc.)
 - **Add events manually** (not only from the scraper)
 - Approve, reject, or publish to the public `events` table
 - Bulk approve / reject / delete / publish
@@ -77,6 +77,13 @@ cp .env.scripts.example .env.scripts   # then fill in keys
 npm run scrape                        # scrape venue sites → draft_events
 npm run scrape:restore-drafts         # fix draft status after bad scrape run
 npm run scrape:publish-approved       # publish approved drafts to events
+npm run discover:ticketswap           # preview TicketSwap links (no writes)
+npm run discover:ticketswap -- --write
+```
+
+`discover:ticketswap` looks up upcoming drafts and published events on TicketSwap's public event sitemap and proposes a link when the date, venue, and title agree. The default is a dry run. `--write` stores a link only when the row is still empty and an admin has not set or cleared it. `--sold-out-only` limits the run to sold-out events. See [docs/ticketswap.md](docs/ticketswap.md).
+
+```bash
 npm run enrich:djs -- --dry-run       # Spotify enrichment (bulk)
 npm run enrich:dj:ra -- --url "…" --name "…" --dry-run   # RA enrichment (single DJ)
 npm run search:enrich:djs -- --dry-run --limit 10       # SoundCloud + RA search (preview)

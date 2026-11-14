@@ -45,6 +45,7 @@ export interface DraftEvent {
   description: string | null;
   lineup: string[] | null;
   ticket_url: string | null;
+  ticketswap_url?: string | null;
   image_url: string | null;
   external_url: string | null;
   external_id: string | null;
@@ -68,6 +69,7 @@ export interface Event {
   description: string | null;
   lineup?: string[] | null;
   ticket_url: string | null;
+  ticketswap_url?: string | null;
   image_url: string | null;
   external_url: string | null;
   external_id: string | null;
@@ -88,6 +90,7 @@ export interface DraftEventFormData {
   lineup: string;
   image_url: string;
   ticket_url: string;
+  ticketswap_url: string;
   external_url: string;
 }
 

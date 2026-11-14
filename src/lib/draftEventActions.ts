@@ -1,4 +1,8 @@
 import { withSoldOutManual } from './soldOutManual';
+import {
+  TICKETSWAP_URL_MANUAL_KEY,
+  withTicketSwapManual,
+} from './ticketswapManual';
 import { supabase } from './supabase';
 import { mergeLineupDjResults } from './draftApproveMessages';
 import {
@@ -37,6 +41,7 @@ export function formDataToUpdatePayload(data: DraftEventFormData) {
     lineup: parseLineupText(data.lineup),
     image_url: data.image_url.trim() || null,
     ticket_url: data.ticket_url.trim() || null,
+    ticketswap_url: data.ticketswap_url.trim() || null,
     external_url: data.external_url.trim() || null,
     updated_at: new Date().toISOString(),
   };
@@ -75,6 +80,9 @@ export async function createDraftEvent(
         manual: true,
         created_at: new Date().toISOString(),
         ...(data.sold_out ? { sold_out_manual: true } : {}),
+        ...(data.ticketswap_url.trim()
+          ? { [TICKETSWAP_URL_MANUAL_KEY]: true }
+          : {}),
       },
     })
     .select('*')
@@ -98,11 +106,15 @@ export async function saveDraftEvent(
     externalId?: string | null;
     rawData?: Record<string, unknown> | null;
     soldOutChanged?: boolean;
+    ticketswapChanged?: boolean;
   },
 ): Promise<void> {
   const payload: Record<string, unknown> = formDataToUpdatePayload(data);
-  if (options?.soldOutChanged) {
-    payload.raw_data = withSoldOutManual(options.rawData);
+  if (options?.soldOutChanged || options?.ticketswapChanged) {
+    let raw = options.rawData ?? {};
+    if (options.soldOutChanged) raw = withSoldOutManual(raw);
+    if (options.ticketswapChanged) raw = withTicketSwapManual(raw);
+    payload.raw_data = raw;
   }
 
   const { error } = await supabase
@@ -118,6 +130,7 @@ export async function saveDraftEvent(
     .from('events')
     .update({
       sold_out: data.sold_out === true,
+      ticketswap_url: data.ticketswap_url.trim() || null,
       updated_at: new Date().toISOString(),
     })
     .eq('source_id', options.sourceId)

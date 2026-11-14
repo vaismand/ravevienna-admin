@@ -1,4 +1,5 @@
 import type { DraftEventFormData, EventSource, Venue } from '../../types/database';
+import { isTicketSwapUrl, ticketSwapUrlError } from '../../lib/ticketswapUrl';
 import { GenreMultiSelect } from '../GenreMultiSelect/GenreMultiSelect';
 import styles from './DraftEventFormFields.module.css';
 
@@ -25,6 +26,10 @@ export function DraftEventFormFields({
   ) => {
     onChange({ ...form, [key]: value });
   };
+  const ticketswapError = ticketSwapUrlError(form.ticketswap_url);
+  const ticketswapHref = isTicketSwapUrl(form.ticketswap_url)
+    ? form.ticketswap_url.trim()
+    : null;
 
   return (
     <div className={styles.form}>
@@ -167,6 +172,44 @@ export function DraftEventFormFields({
           placeholder="https://…"
         />
       </label>
+
+      <div className={styles.field}>
+        <span className={styles.label}>TicketSwap URL</span>
+        <div className={styles.urlRow}>
+          <input
+            className={styles.input}
+            type="url"
+            inputMode="url"
+            value={form.ticketswap_url}
+            onChange={(e) => update('ticketswap_url', e.target.value)}
+            placeholder="https://www.ticketswap.com/…"
+            aria-invalid={ticketswapError ? true : undefined}
+          />
+          {form.ticketswap_url.trim() && (
+            <button
+              type="button"
+              className={styles.clearBtn}
+              onClick={() => update('ticketswap_url', '')}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        {ticketswapHref && (
+          <a
+            className={styles.inlineLink}
+            href={ticketswapHref}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Open TicketSwap page
+          </a>
+        )}
+        <span className={ticketswapError ? styles.fieldError : styles.hint}>
+          {ticketswapError ??
+            'Resale link for the app. Any ticketswap.com, ticketswap.at, or other TicketSwap locale. Clear and save to remove it.'}
+        </span>
+      </div>
 
       <label className={styles.field}>
         <span className={styles.label}>External URL</span>

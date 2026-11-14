@@ -1,4 +1,5 @@
 import type { DraftEventFormData } from '../types/database';
+import { ticketSwapUrlError } from './ticketswapUrl';
 
 export const EMPTY_DRAFT_FORM: DraftEventFormData = {
   title: '',
@@ -12,6 +13,7 @@ export const EMPTY_DRAFT_FORM: DraftEventFormData = {
   lineup: '',
   image_url: '',
   ticket_url: '',
+  ticketswap_url: '',
   external_url: '',
 };
 
@@ -23,5 +25,5 @@ export function validateDraftForm(
   if (options?.requireSource && !options.sourceId) {
     return 'Source is required for manual events (needed when publishing).';
   }
-  return null;
+  return ticketSwapUrlError(data.ticketswap_url);
 }

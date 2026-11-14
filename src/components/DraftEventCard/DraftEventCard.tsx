@@ -1,4 +1,5 @@
 import { formatDate, formatPrice, formatTime } from '../../utils/format';
+import { isTicketSwapUrl } from '../../lib/ticketswapUrl';
 import type { DraftEvent, ReferenceMaps } from '../../types/database';
 import { StatusBadge } from '../StatusBadge/StatusBadge';
 import styles from './DraftEventCard.module.css';
@@ -25,6 +26,9 @@ export function DraftEventCard({
     ? (maps.sources.get(event.source_id)?.name ?? 'Unknown source')
     : 'No source';
   const genres = event.genres ?? [];
+  const ticketswapUrl = isTicketSwapUrl(event.ticketswap_url)
+    ? (event.ticketswap_url ?? '').trim()
+    : null;
 
   return (
     <article className={`${styles.card} ${selected ? styles.selected : ''}`}>
@@ -70,6 +74,12 @@ export function DraftEventCard({
                 <span>{formatPrice(event.price)}</span>
               </>
             )}
+            {ticketswapUrl && (
+              <>
+                <span className={styles.dot}>·</span>
+                <span className={styles.swapTag}>TicketSwap</span>
+              </>
+            )}
           </div>
 
           {genres.length > 0 && (
@@ -103,6 +113,16 @@ export function DraftEventCard({
                 className={styles.linkBtn}
               >
                 Tickets
+              </a>
+            )}
+            {ticketswapUrl && (
+              <a
+                href={ticketswapUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={styles.linkBtn}
+              >
+                TicketSwap
               </a>
             )}
           </div>
