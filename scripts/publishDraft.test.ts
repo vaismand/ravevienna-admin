@@ -310,6 +310,7 @@ describe("publishDraftRecord", () => {
     assert.equal(events[0]?.draft_event_id, "draft-1");
     assert.equal(events[0]?.price, 15);
     assert.equal(events[0]?.sold_out, false);
+    assert.equal(events[0]?.ticketswap_url, null);
     assert.deepEqual(events[0]?.genres, ["Techno", "Electronic"]);
     assert.deepEqual(events[0]?.lineup, ["Alice", "Bob", "Alice"]);
 
@@ -350,6 +351,24 @@ describe("publishDraftRecord", () => {
     );
     assert.equal(rows(db, "events")[0]?.sold_out, false);
     assert.equal(rows(db, "events").length, 1);
+  });
+
+  it("copies ticketswap_url from the draft onto the published event", async () => {
+    const { db, client } = createDb();
+    db.set("draft_events", [{ id: "draft-1", status: "approved" }]);
+    const url = "https://www.ticketswap.at/club-tickets/paradies-garten";
+
+    await publishDraftRecord(
+      client,
+      draft({ ticketswap_url: url }),
+    );
+    assert.equal(rows(db, "events")[0]?.ticketswap_url, url);
+
+    await publishDraftRecord(
+      client,
+      draft({ ticketswap_url: null, status: "published" }),
+    );
+    assert.equal(rows(db, "events")[0]?.ticketswap_url, null);
   });
 
   it("re-publishes without duplicating DJs or event_djs", async () => {

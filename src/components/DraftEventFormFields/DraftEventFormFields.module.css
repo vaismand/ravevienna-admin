@@ -59,3 +59,46 @@
 .toggleRow input {
   accent-color: #00f0d0;
 }
+
+.urlRow {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.urlRow .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.clearBtn {
+  flex-shrink: 0;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 240, 208, 0.25);
+  background: transparent;
+  color: #8a9a9a;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.clearBtn:hover {
+  color: #fff;
+  border-color: rgba(0, 240, 208, 0.45);
+}
+
+.inlineLink {
+  font-size: 0.75rem;
+  color: #00f0d0;
+  text-decoration: none;
+}
+
+.inlineLink:hover {
+  text-decoration: underline;
+}
+
+.fieldError {
+  font-size: 0.72rem;
+  color: #ff8f8f;
+  line-height: 1.35;
+}

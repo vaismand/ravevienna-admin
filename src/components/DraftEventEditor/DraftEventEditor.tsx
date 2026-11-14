@@ -25,6 +25,7 @@ function toFormData(event: DraftEvent): DraftEventFormData {
     lineup: formatLineupArray(event.lineup),
     image_url: event.image_url ?? '',
     ticket_url: event.ticket_url ?? '',
+    ticketswap_url: event.ticketswap_url ?? '',
     external_url: event.external_url ?? '',
   };
 }
@@ -74,7 +75,9 @@ export function DraftEventEditor({
       <div className={styles.panel}>
         <header className={styles.header}>
           <div className={styles.headerLeft}>
-            <h2 className={styles.heading}>Edit draft event</h2>
+            <h2 className={styles.heading}>
+              {event.status === 'published' ? 'Edit event' : 'Edit draft event'}
+            </h2>
             <StatusBadge status={event.status} />
           </div>
           <button

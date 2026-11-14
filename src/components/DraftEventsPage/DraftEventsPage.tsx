@@ -21,6 +21,8 @@ import {
 } from '../../lib/draftApproveMessages';
 import { parseLineupText } from '../../lib/lineup';
 import { withSoldOutManual } from '../../lib/soldOutManual';
+import { withTicketSwapManual } from '../../lib/ticketswapManual';
+import { validateDraftForm } from '../../lib/draftEventForm';
 import { formatPostgrestError } from '../../lib/supabaseErrors';
 import { matchesSearch } from '../../utils/format';
 import type {
@@ -171,25 +173,47 @@ export function DraftEventsPage() {
 
   const draftSaveOptions = (event: DraftEvent, data: DraftEventFormData) => {
     const soldOutChanged = data.sold_out !== (event.sold_out === true);
+    const ticketswapChanged =
+      data.ticketswap_url.trim() !== (event.ticketswap_url ?? '').trim();
     return {
       sourceId: event.source_id,
       externalId: event.external_id,
       rawData: event.raw_data,
       soldOutChanged,
+      ticketswapChanged,
     };
+  };
+
+  const rawDataAfterSave = (
+    event: DraftEvent,
+    options: { soldOutChanged: boolean; ticketswapChanged: boolean },
+  ) => {
+    if (!options.soldOutChanged && !options.ticketswapChanged) {
+      return event.raw_data;
+    }
+    let raw = event.raw_data ?? {};
+    if (options.soldOutChanged) raw = withSoldOutManual(raw);
+    if (options.ticketswapChanged) raw = withTicketSwapManual(raw);
+    return raw;
+  };
+
+  const rejectInvalidForm = (data: DraftEventFormData): boolean => {
+    const errorMessage = validateDraftForm(data);
+    if (!errorMessage) return false;
+    notify(errorMessage, 'error');
+    return true;
   };
 
   const handleSave = async (data: DraftEventFormData, djIds: string[]) => {
     if (!editingEvent) return;
+    if (rejectInvalidForm(data)) return;
     await runWithBusy(async () => {
       const options = draftSaveOptions(editingEvent, data);
       await saveDraftEvent(editingEvent.id, data, options);
       const merged: DraftEvent = {
         ...editingEvent,
         ...formDataToUpdatePayload(data),
-        ...(options.soldOutChanged
-          ? { raw_data: withSoldOutManual(editingEvent.raw_data) }
-          : {}),
+        raw_data: rawDataAfterSave(editingEvent, options),
       };
       await syncEventDjsForDraft(
         merged.source_id,
@@ -207,6 +231,7 @@ export function DraftEventsPage() {
     formData?: DraftEventFormData,
   ) => {
     if (!editingEvent) return;
+    if (formData && rejectInvalidForm(formData)) return;
     await runWithBusy(async () => {
       let djs = null;
       if (status === 'approved' && formData) {
@@ -234,15 +259,14 @@ export function DraftEventsPage() {
 
   const handlePublish = async (data: DraftEventFormData) => {
     if (!editingEvent) return;
+    if (rejectInvalidForm(data)) return;
     await runWithBusy(async () => {
       const options = draftSaveOptions(editingEvent, data);
       await saveDraftEvent(editingEvent.id, data, options);
       const merged: DraftEvent = {
         ...editingEvent,
         ...formDataToUpdatePayload(data),
-        ...(options.soldOutChanged
-          ? { raw_data: withSoldOutManual(editingEvent.raw_data) }
-          : {}),
+        raw_data: rawDataAfterSave(editingEvent, options),
       };
       const { djs } = await publishDraftEvent(merged);
       notify(formatDraftPublishMessage(1, djs), 'success');

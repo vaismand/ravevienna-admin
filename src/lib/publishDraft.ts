@@ -107,6 +107,7 @@ export function buildPublishedEventPayload(draft: DraftEvent) {
     description: draft.description,
     lineup: lineupToTextArray(draft.lineup),
     ticket_url: draft.ticket_url,
+    ticketswap_url: draft.ticketswap_url ?? null,
     image_url: draft.image_url,
     external_url: draft.external_url,
     external_id: draft.external_id,
