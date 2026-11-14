@@ -1,0 +1,25 @@
+{
+  "is_sold_out": false,
+  "categories": [
+    {
+      "name": null,
+      "items": [
+        {
+          "is_sold_out": true,
+          "unit_price": { "amount": "19.00", "currency": "EUR" },
+          "product": "https://shopping-api.paylogic.com/products/early-bird"
+        },
+        {
+          "is_sold_out": true,
+          "unit_price": { "amount": "26.00", "currency": "EUR" },
+          "product": "https://shopping-api.paylogic.com/products/regular"
+        },
+        {
+          "is_sold_out": true,
+          "unit_price": { "amount": "28.00", "currency": "EUR" },
+          "product": "https://shopping-api.paylogic.com/products/final-wave"
+        }
+      ]
+    }
+  ]
+}

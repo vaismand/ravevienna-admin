@@ -6,6 +6,7 @@ export const EMPTY_DRAFT_FORM: DraftEventFormData = {
   event_date: '',
   start_time: '',
   price: '',
+  sold_out: false,
   genres: [],
   description: '',
   lineup: '',

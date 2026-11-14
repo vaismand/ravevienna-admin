@@ -19,6 +19,7 @@ function toFormData(event: DraftEvent): DraftEventFormData {
     event_date: event.event_date?.slice(0, 10) ?? '',
     start_time: event.start_time?.slice(0, 5) ?? '',
     price: formatPrice(event.price).replace(/^€/, '') || '',
+    sold_out: event.sold_out === true,
     genres: event.genres ?? [],
     description: event.description ?? '',
     lineup: formatLineupArray(event.lineup),

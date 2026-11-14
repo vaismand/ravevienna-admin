@@ -3,6 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 import { loadScriptEnv } from "../../scripts/lib/loadEnv.ts";
 import { normalizeEventGenres } from "../../scripts/lib/genres.ts";
 import { getTodayDateKey, parseDateKey, toDateKey } from "../../scripts/lib/dates.ts";
+import { isSoldOutManuallySet } from "../../src/lib/soldOutManual.ts";
+import {
+  planPublishedSoldOutUpdate,
+  scrapedSoldOutForDraft,
+} from "./soldOutSync.ts";
 
 loadScriptEnv();
 import { enrichEventText } from "./scrapers/lineup";
@@ -31,13 +36,23 @@ type ExistingDraftRow = {
   external_id: string;
   lineup: string[] | null;
   status: string;
+  raw_data: Record<string, unknown> | null;
+  sold_out: boolean | null;
 };
 
 type LiveEventRow = {
+  id: string;
   external_id: string | null;
   title: string;
   event_date: string;
   venue_id: string;
+  sold_out: boolean | null;
+};
+
+type SoldOutPatch = {
+  eventId: string;
+  draftExternalId: string | null;
+  sold_out: boolean;
 };
 
 function normalizeTitle(title: string): string {
@@ -67,11 +82,17 @@ function isPastEventDate(eventDate: string | null): boolean {
 function buildDraftRow(
   source: ScrapeSource,
   event: ScrapedEvent,
-  existingLineup: string[]
+  existing: ExistingDraftRow | undefined
 ) {
   const enriched = enrichEventText(event.description);
+  const existingLineup = Array.isArray(existing?.lineup) ? existing.lineup : [];
   const lineup =
     enriched.lineup.length > 0 ? enriched.lineup : existingLineup;
+  const soldOut = scrapedSoldOutForDraft({
+    scrapedSoldOut: event.sold_out === true,
+    existingRawData: existing?.raw_data,
+    existingSoldOut: existing?.sold_out,
+  });
 
   return {
     source_id: source.id,
@@ -80,6 +101,7 @@ function buildDraftRow(
     event_date: event.event_date,
     start_time: event.start_time,
     price: event.price,
+    sold_out: soldOut.soldOut,
     genres: normalizeEventGenres(event.genres),
     description: enriched.description,
     lineup,
@@ -92,6 +114,7 @@ function buildDraftRow(
     raw_data: {
       ...event.raw_data,
       extracted_lineup: enriched.lineup,
+      ...(soldOut.preserveManual ? { sold_out_manual: true } : {}),
     },
   };
 }
@@ -117,12 +140,12 @@ async function upsertDraftEvents(source: ScrapeSource, events: ScrapedEvent[]) {
   ] = await Promise.all([
     supabase
       .from("draft_events")
-      .select("external_id, lineup, status")
+      .select("external_id, lineup, status, raw_data, sold_out")
       .eq("source_id", source.id)
       .in("external_id", externalIds),
     supabase
       .from("events")
-      .select("external_id, title, event_date, venue_id")
+      .select("id, external_id, title, event_date, venue_id, sold_out")
       .eq("source_id", source.id),
   ]);
 
@@ -140,22 +163,23 @@ async function upsertDraftEvents(source: ScrapeSource, events: ScrapedEvent[]) {
     ((existingRows ?? []) as ExistingDraftRow[]).map((row) => [row.external_id, row])
   );
 
-  const liveExternalIds = new Set(
-    ((liveEvents ?? []) as LiveEventRow[])
-      .map((row) => row.external_id)
-      .filter((id): id is string => Boolean(id))
-  );
-
-  const liveIdentityKeys = new Set(
-    ((liveEvents ?? []) as LiveEventRow[]).map((row) =>
-      buildEventIdentityKey(row.venue_id, row.title, row.event_date)
-    )
-  );
+  const liveRows = (liveEvents ?? []) as LiveEventRow[];
+  const liveByExternalId = new Map<string, LiveEventRow>();
+  const liveByIdentity = new Map<string, LiveEventRow>();
+  for (const row of liveRows) {
+    if (row.external_id) liveByExternalId.set(row.external_id, row);
+    liveByIdentity.set(
+      buildEventIdentityKey(row.venue_id, row.title, row.event_date),
+      row
+    );
+  }
 
   const rowsToUpsert: ReturnType<typeof buildDraftRow>[] = [];
+  const soldOutPatches: SoldOutPatch[] = [];
   let skippedProtected = 0;
   let skippedAlreadyLive = 0;
   let skippedNonPending = 0;
+  let keptManualSoldOut = 0;
 
   for (const event of upcomingEvents) {
     const existing = existingByExternalId.get(event.external_id);
@@ -164,16 +188,34 @@ async function upsertDraftEvents(source: ScrapeSource, events: ScrapedEvent[]) {
       event.title,
       event.event_date
     );
+    const live =
+      liveByExternalId.get(event.external_id) ?? liveByIdentity.get(identityKey);
+
+    if (live) {
+      const manual = isSoldOutManuallySet(existing?.raw_data);
+      const patch = planPublishedSoldOutUpdate({
+        eventId: live.id,
+        scrapedSoldOut: event.sold_out === true,
+        currentSoldOut: live.sold_out,
+        draftRawData: existing?.raw_data,
+      });
+      if (patch) {
+        soldOutPatches.push({
+          eventId: patch.id,
+          draftExternalId: existing?.external_id ?? null,
+          sold_out: patch.sold_out,
+        });
+      } else if (manual) {
+        keptManualSoldOut += 1;
+      }
+    }
 
     if (existing && PROTECTED_DRAFT_STATUSES.has(existing.status)) {
       skippedProtected += 1;
       continue;
     }
 
-    if (
-      liveExternalIds.has(event.external_id) ||
-      liveIdentityKeys.has(identityKey)
-    ) {
+    if (live) {
       skippedAlreadyLive += 1;
       continue;
     }
@@ -183,13 +225,42 @@ async function upsertDraftEvents(source: ScrapeSource, events: ScrapedEvent[]) {
       continue;
     }
 
-    const existingLineup = Array.isArray(existing?.lineup) ? existing.lineup : [];
-    rowsToUpsert.push(buildDraftRow(source, event, existingLineup));
+    rowsToUpsert.push(buildDraftRow(source, event, existing));
+  }
+
+  for (const patch of soldOutPatches) {
+    const { error: eventSoldOutError } = await supabase
+      .from("events")
+      .update({ sold_out: patch.sold_out })
+      .eq("id", patch.eventId);
+
+    if (eventSoldOutError) {
+      console.error(
+        `Could not update sold_out for live event ${patch.eventId}:`,
+        eventSoldOutError
+      );
+      continue;
+    }
+
+    if (!patch.draftExternalId) continue;
+
+    const { error: draftSoldOutError } = await supabase
+      .from("draft_events")
+      .update({ sold_out: patch.sold_out })
+      .eq("source_id", source.id)
+      .eq("external_id", patch.draftExternalId);
+
+    if (draftSoldOutError) {
+      console.error(
+        `Could not update sold_out for draft ${patch.draftExternalId}:`,
+        draftSoldOutError
+      );
+    }
   }
 
   if (rowsToUpsert.length === 0) {
     console.log(
-      `No draft changes for ${source.name} (protected ${skippedProtected}, already live ${skippedAlreadyLive}, other status ${skippedNonPending})`
+      `No draft changes for ${source.name} (protected ${skippedProtected}, already live ${skippedAlreadyLive}, other status ${skippedNonPending}, manual sold out kept ${keptManualSoldOut}, sold out updated ${soldOutPatches.length})`
     );
     return;
   }
@@ -209,7 +280,7 @@ async function upsertDraftEvents(source: ScrapeSource, events: ScrapedEvent[]) {
   const updated = rowsToUpsert.length - inserted;
 
   console.log(
-    `Draft sync for ${source.name}: ${inserted} new, ${updated} pending updated (past skipped ${skippedPast}, protected ${skippedProtected}, already live ${skippedAlreadyLive}, other status ${skippedNonPending})`
+    `Draft sync for ${source.name}: ${inserted} new, ${updated} pending updated (past skipped ${skippedPast}, protected ${skippedProtected}, already live ${skippedAlreadyLive}, other status ${skippedNonPending}, manual sold out kept ${keptManualSoldOut}, sold out updated ${soldOutPatches.length})`
   );
 }
 

@@ -9,6 +9,7 @@ import {
   parsePrice,
   sleep,
 } from "./helpers";
+import { readJsonLdOfferSummary } from "./ticketOffers";
 import type { ScrapedEvent, ScrapeSource } from "./types";
 
 type FlexListingEvent = {
@@ -26,6 +27,7 @@ type FlexDetailEnrichment = {
   image_url: string | null;
   ticket_url: string | null;
   price: number | null;
+  sold_out: boolean;
   genres: string[];
   event_date: string | null;
   start_time: string | null;
@@ -200,6 +202,7 @@ function extractFlexDetailFromHtml(
     image_url: image_url ? new URL(image_url, eventUrl).toString() : null,
     ticket_url: ticketUrl ? new URL(ticketUrl, eventUrl).toString() : null,
     price: parsePrice(description),
+    sold_out: readJsonLdOfferSummary(data?.offers).soldOut,
     genres: guessGenres(`${title ?? ""} ${description} ${categories.join(" ")}`),
     event_date: local.date,
     start_time: local.time,
@@ -235,6 +238,7 @@ function mergeFlexEvent(
     event_date: listing.event_date ?? detail?.event_date ?? null,
     start_time: listing.start_time ?? detail?.start_time ?? null,
     price: detail?.price ?? parsePrice(description ?? ""),
+    sold_out: detail?.sold_out === true,
     genres:
       detail?.genres.length && detail.genres.some(Boolean)
         ? detail.genres

@@ -1,3 +1,4 @@
+import { withSoldOutManual } from './soldOutManual';
 import { supabase } from './supabase';
 import { mergeLineupDjResults } from './draftApproveMessages';
 import {
@@ -30,6 +31,7 @@ export function formDataToUpdatePayload(data: DraftEventFormData) {
     event_date: data.event_date || null,
     start_time: data.start_time || null,
     price: parsePrice(data.price),
+    sold_out: data.sold_out === true,
     genres: data.genres.length > 0 ? data.genres : null,
     description: data.description.trim() || null,
     lineup: parseLineupText(data.lineup),
@@ -69,7 +71,11 @@ export async function createDraftEvent(
       external_id: externalId,
       status: initialStatus,
       confidence: 1,
-      raw_data: { manual: true, created_at: new Date().toISOString() },
+      raw_data: {
+        manual: true,
+        created_at: new Date().toISOString(),
+        ...(data.sold_out ? { sold_out_manual: true } : {}),
+      },
     })
     .select('*')
     .single();
@@ -87,13 +93,37 @@ export async function createDraftEvent(
 export async function saveDraftEvent(
   id: string,
   data: DraftEventFormData,
+  options?: {
+    sourceId?: string | null;
+    externalId?: string | null;
+    rawData?: Record<string, unknown> | null;
+    soldOutChanged?: boolean;
+  },
 ): Promise<void> {
+  const payload: Record<string, unknown> = formDataToUpdatePayload(data);
+  if (options?.soldOutChanged) {
+    payload.raw_data = withSoldOutManual(options.rawData);
+  }
+
   const { error } = await supabase
     .from('draft_events')
-    .update(formDataToUpdatePayload(data))
+    .update(payload)
     .eq('id', id);
 
   if (error) throw new Error(formatPostgrestError(error));
+
+  if (!options?.sourceId || !options.externalId) return;
+
+  const { error: eventError } = await supabase
+    .from('events')
+    .update({
+      sold_out: data.sold_out === true,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('source_id', options.sourceId)
+    .eq('external_id', options.externalId);
+
+  if (eventError) throw new Error(formatPostgrestError(eventError));
 }
 
 export async function updateDraftStatus(

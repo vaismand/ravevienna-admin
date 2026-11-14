@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "__typename": "ShopItem",
+      "name": "Super Early Bird",
+      "unavailabilityReason": "Ausverkauft",
+      "price": { "amount": 14, "currency": { "code": "EUR" } }
+    },
+    {
+      "__typename": "ShopItem",
+      "name": "VVK - Regulär",
+      "unavailabilityReason": null,
+      "price": { "amount": 20, "currency": { "code": "EUR" } }
+    },
+    {
+      "__typename": "ShopItem",
+      "name": "VVK last minute",
+      "unavailabilityReason": null,
+      "price": { "amount": 25, "currency": { "code": "EUR" } }
+    }
+  ]
+}

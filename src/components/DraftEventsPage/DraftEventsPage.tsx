@@ -20,6 +20,7 @@ import {
   formatDraftPublishMessage,
 } from '../../lib/draftApproveMessages';
 import { parseLineupText } from '../../lib/lineup';
+import { withSoldOutManual } from '../../lib/soldOutManual';
 import { formatPostgrestError } from '../../lib/supabaseErrors';
 import { matchesSearch } from '../../utils/format';
 import type {
@@ -168,13 +169,27 @@ export function DraftEventsPage() {
     });
   };
 
+  const draftSaveOptions = (event: DraftEvent, data: DraftEventFormData) => {
+    const soldOutChanged = data.sold_out !== (event.sold_out === true);
+    return {
+      sourceId: event.source_id,
+      externalId: event.external_id,
+      rawData: event.raw_data,
+      soldOutChanged,
+    };
+  };
+
   const handleSave = async (data: DraftEventFormData, djIds: string[]) => {
     if (!editingEvent) return;
     await runWithBusy(async () => {
-      await saveDraftEvent(editingEvent.id, data);
+      const options = draftSaveOptions(editingEvent, data);
+      await saveDraftEvent(editingEvent.id, data, options);
       const merged: DraftEvent = {
         ...editingEvent,
         ...formDataToUpdatePayload(data),
+        ...(options.soldOutChanged
+          ? { raw_data: withSoldOutManual(editingEvent.raw_data) }
+          : {}),
       };
       await syncEventDjsForDraft(
         merged.source_id,
@@ -195,7 +210,11 @@ export function DraftEventsPage() {
     await runWithBusy(async () => {
       let djs = null;
       if (status === 'approved' && formData) {
-        await saveDraftEvent(editingEvent.id, formData);
+        await saveDraftEvent(
+          editingEvent.id,
+          formData,
+          draftSaveOptions(editingEvent, formData),
+        );
         djs = await updateDraftStatus(editingEvent.id, status, {
           lineup: parseLineupText(formData.lineup),
           eventGenres: formData.genres,
@@ -216,10 +235,14 @@ export function DraftEventsPage() {
   const handlePublish = async (data: DraftEventFormData) => {
     if (!editingEvent) return;
     await runWithBusy(async () => {
-      await saveDraftEvent(editingEvent.id, data);
+      const options = draftSaveOptions(editingEvent, data);
+      await saveDraftEvent(editingEvent.id, data, options);
       const merged: DraftEvent = {
         ...editingEvent,
         ...formDataToUpdatePayload(data),
+        ...(options.soldOutChanged
+          ? { raw_data: withSoldOutManual(editingEvent.raw_data) }
+          : {}),
       };
       const { djs } = await publishDraftEvent(merged);
       notify(formatDraftPublishMessage(1, djs), 'success');
