@@ -13,6 +13,7 @@ export function submissionToFormData(
     description: s.description ?? '',
     lineup: '',
     contact: s.contact ?? '',
+    is_promoted: false,
   };
 }
 

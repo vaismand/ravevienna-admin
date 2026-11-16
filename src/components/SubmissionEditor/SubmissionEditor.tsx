@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type {
   EventSubmission,
   EventSubmissionFormData,
@@ -23,6 +23,10 @@ interface SubmissionEditorProps {
   onReject: () => Promise<void>;
   onPending: () => Promise<void>;
   onPublish: (data: EventSubmissionFormData, djIds: string[]) => Promise<void>;
+  isPromoted: boolean;
+  promotionLoaded: boolean;
+  columnReady: boolean;
+  hasPublishedEventRow: boolean;
 }
 
 export function SubmissionEditor({
@@ -37,10 +41,15 @@ export function SubmissionEditor({
   onReject,
   onPending,
   onPublish,
+  isPromoted,
+  promotionLoaded,
+  columnReady,
+  hasPublishedEventRow,
 }: SubmissionEditorProps) {
-  const [form, setForm] = useState<EventSubmissionFormData>(() =>
-    submissionToFormData(submission),
-  );
+  const [form, setForm] = useState<EventSubmissionFormData>(() => ({
+    ...submissionToFormData(submission),
+    is_promoted: isPromoted,
+  }));
   const externalId = `submission-${submission.id}`;
   const {
     activeDjs,
@@ -50,9 +59,11 @@ export function SubmissionEditor({
     hasPublishedEvent,
   } = useEventDjSelection(open, submissionSourceId, externalId);
 
-  useEffect(() => {
-    if (open) setForm(submissionToFormData(submission));
-  }, [open, submission]);
+  const promotedHint = !columnReady
+    ? 'Run the is_promoted migration before using this. The scraper will never set it.'
+    : hasPublishedEventRow
+      ? 'Pins this event to the top of Tonight. A few per day, per genre, is enough. Saving here is the only thing that changes it.'
+      : 'Publish the event to save this. It is stored on the live event, and a re-scrape will not clear it.';
 
   if (!open) return null;
 
@@ -76,7 +87,14 @@ export function SubmissionEditor({
         </header>
 
         <div className={styles.formScroll}>
-          <SubmissionFormFields form={form} onChange={setForm} venues={venues} />
+          <SubmissionFormFields
+            form={form}
+            onChange={setForm}
+            venues={venues}
+            showPromoted
+            promotedDisabled={!promotionLoaded || !columnReady}
+            promotedHint={promotedHint}
+          />
           <EventDjSelect
             activeDjs={activeDjs}
             selectedDjIds={selectedDjIds}

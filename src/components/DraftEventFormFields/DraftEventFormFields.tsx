@@ -1,6 +1,7 @@
 import type { DraftEventFormData, EventSource, Venue } from '../../types/database';
 import { isTicketSwapUrl, ticketSwapUrlError } from '../../lib/ticketswapUrl';
 import { GenreMultiSelect } from '../GenreMultiSelect/GenreMultiSelect';
+import { PromotedControl } from '../PromotedControl/PromotedControl';
 import styles from './DraftEventFormFields.module.css';
 
 interface DraftEventFormFieldsProps {
@@ -10,6 +11,9 @@ interface DraftEventFormFieldsProps {
   sources?: EventSource[];
   sourceId?: string;
   onSourceChange?: (sourceId: string) => void;
+  showPromoted?: boolean;
+  promotedDisabled?: boolean;
+  promotedHint?: string;
 }
 
 export function DraftEventFormFields({
@@ -19,6 +23,9 @@ export function DraftEventFormFields({
   sources,
   sourceId,
   onSourceChange,
+  showPromoted = false,
+  promotedDisabled = false,
+  promotedHint,
 }: DraftEventFormFieldsProps) {
   const update = <K extends keyof DraftEventFormData>(
     key: K,
@@ -121,6 +128,16 @@ export function DraftEventFormFields({
         />
         <span>Sold out</span>
       </label>
+
+      {showPromoted && (
+        <PromotedControl
+          checked={form.is_promoted}
+          disabled={promotedDisabled}
+          hint={promotedHint}
+          ariaLabel="Promoted"
+          onChange={(checked) => update('is_promoted', checked)}
+        />
+      )}
 
       <div className={styles.field}>
         <span className={styles.label}>Genres</span>

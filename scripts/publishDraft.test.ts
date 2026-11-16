@@ -8,6 +8,7 @@ import {
   genresJsonToTextArray,
   lineupToTextArray,
   normalizeEventPrice,
+  buildPublishedEventPayload,
   publishDraftRecord,
 } from "../src/lib/publishDraft.ts";
 import { prepareLineupForDjImport } from "./lib/lineupArtists.ts";
@@ -373,6 +374,30 @@ describe("publishDraftRecord", () => {
       draft({ ticketswap_url: null, status: "published" }),
     );
     assert.equal(rows(db, "events")[0]?.ticketswap_url, null);
+  });
+
+  it("does not set or clear is_promoted when publishing again", async () => {
+    const { db, client } = createDb();
+    db.set("draft_events", [{ id: "draft-1", status: "approved" }]);
+    db.set("events", [
+      {
+        id: "event-kept",
+        source_id: "source-1",
+        external_id: "ext-1",
+        is_promoted: true,
+        sold_out: true,
+      },
+    ]);
+
+    const payload = buildPublishedEventPayload(draft());
+    assert.equal("is_promoted" in payload, false);
+
+    await publishDraftRecord(client, draft({ status: "published", sold_out: false }));
+
+    assert.equal(rows(db, "events").length, 1);
+    assert.equal(rows(db, "events")[0]?.id, "event-kept");
+    assert.equal(rows(db, "events")[0]?.is_promoted, true);
+    assert.equal(rows(db, "events")[0]?.sold_out, false);
   });
 
   it("re-publishes without duplicating DJs or event_djs", async () => {

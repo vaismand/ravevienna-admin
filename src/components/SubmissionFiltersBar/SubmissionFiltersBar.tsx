@@ -21,7 +21,10 @@ export function SubmissionFiltersBar({
   };
 
   const hasActiveFilters =
-    filters.search || filters.venueName || filters.genre;
+    filters.search ||
+    filters.venueName ||
+    filters.genre ||
+    filters.promoted !== 'all';
 
   return (
     <div className={styles.bar}>
@@ -68,12 +71,32 @@ export function SubmissionFiltersBar({
         </select>
       </div>
 
+      <div className={styles.field}>
+        <label className={styles.label}>Promoted</label>
+        <select
+          className={styles.select}
+          value={filters.promoted}
+          onChange={(e) =>
+            update('promoted', e.target.value as SubmissionFilters['promoted'])
+          }
+        >
+          <option value="all">All events</option>
+          <option value="promoted">Promoted</option>
+          <option value="not">Not promoted</option>
+        </select>
+      </div>
+
       {hasActiveFilters && (
         <button
           type="button"
           className={styles.clearBtn}
           onClick={() =>
-            onChange({ search: '', venueName: '', genre: '' })
+            onChange({
+              search: '',
+              venueName: '',
+              genre: '',
+              promoted: 'all',
+            })
           }
         >
           Clear filters

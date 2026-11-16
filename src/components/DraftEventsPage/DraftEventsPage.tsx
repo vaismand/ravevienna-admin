@@ -12,6 +12,7 @@ import {
 } from '../../lib/draftEventActions';
 import { useNotification } from '../../context/NotificationContext';
 import { useDraftEvents } from '../../hooks/useDraftEvents';
+import { usePublishedPromotions } from '../../hooks/usePublishedPromotions';
 import { useReferenceData } from '../../hooks/useReferenceData';
 import { useScriptRunner } from '../../hooks/useScriptRunner';
 import { syncEventDjsForDraft } from '../../lib/eventDjActions';
@@ -23,6 +24,11 @@ import { parseLineupText } from '../../lib/lineup';
 import { withSoldOutManual } from '../../lib/soldOutManual';
 import { withTicketSwapManual } from '../../lib/ticketswapManual';
 import { validateDraftForm } from '../../lib/draftEventForm';
+import { matchesPromotedFilter } from '../../lib/eventPromoted';
+import {
+  promotedColumnMissingMessage,
+  setEventPromoted,
+} from '../../lib/eventPromotedActions';
 import { formatPostgrestError } from '../../lib/supabaseErrors';
 import { matchesSearch } from '../../utils/format';
 import type {
@@ -55,6 +61,7 @@ const defaultFilters = (status: ReviewStatus): DraftEventFilters => ({
   genre: '',
   sourceId: '',
   search: '',
+  promoted: 'all',
 });
 
 export function DraftEventsPage() {
@@ -67,10 +74,27 @@ export function DraftEventsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [promotingId, setPromotingId] = useState<string | null>(null);
 
   const { notify } = useNotification();
   const { events, loading, error, rlsBlocked, totalInDb, reload } =
     useDraftEvents(activeTab);
+  const promotionLookups = useMemo(
+    () =>
+      events.map((event) => ({
+        rowId: event.id,
+        sourceId: event.source_id,
+        externalId: event.external_id,
+      })),
+    [events],
+  );
+  const {
+    byRowId: promotions,
+    columnReady,
+    loaded: promotionLoaded,
+    error: promotionError,
+    patchPromotion,
+  } = usePublishedPromotions(promotionLookups);
   const { venues, sources, maps, loading: refLoading, warning: refWarning } =
     useReferenceData();
   const {
@@ -91,9 +115,17 @@ export function DraftEventsPage() {
       if (filters.genre && !(event.genres ?? []).includes(filters.genre))
         return false;
       if (!matchesSearch(event, filters.search)) return false;
+      if (
+        !matchesPromotedFilter(
+          promotions.get(event.id)?.isPromoted === true,
+          filters.promoted,
+        )
+      ) {
+        return false;
+      }
       return true;
     });
-  }, [events, filters]);
+  }, [events, filters, promotions]);
 
   const selectedEvents = useMemo(
     () => filteredEvents.filter((e) => selectedIds.has(e.id)),
@@ -197,6 +229,23 @@ export function DraftEventsPage() {
     return raw;
   };
 
+  const persistPromotion = async (
+    rowId: string,
+    isPromoted: boolean,
+    eventId?: string,
+  ) => {
+    if (!columnReady) {
+      if (isPromoted) throw new Error(promotedColumnMissingMessage());
+      return;
+    }
+    const known = promotions.get(rowId);
+    const id = eventId ?? known?.eventId;
+    if (!id) return;
+    if ((known?.isPromoted === true) === isPromoted) return;
+    await setEventPromoted(id, isPromoted);
+    patchPromotion(rowId, id, isPromoted);
+  };
+
   const rejectInvalidForm = (data: DraftEventFormData): boolean => {
     const errorMessage = validateDraftForm(data);
     if (!errorMessage) return false;
@@ -220,8 +269,15 @@ export function DraftEventsPage() {
         merged.external_id,
         djIds,
       );
+      const hadLiveEvent = promotions.has(editingEvent.id);
+      await persistPromotion(editingEvent.id, data.is_promoted);
       setEditingEvent(merged);
-      notify('Draft event saved.', 'success');
+      notify(
+        data.is_promoted && !hadLiveEvent
+          ? 'Draft saved. Promoted is applied when you publish the event.'
+          : 'Draft event saved.',
+        'success',
+      );
       await reload();
     });
   };
@@ -233,7 +289,7 @@ export function DraftEventsPage() {
     if (!editingEvent) return;
     if (formData && rejectInvalidForm(formData)) return;
     await runWithBusy(async () => {
-      let djs = null;
+      let djs: Awaited<ReturnType<typeof updateDraftStatus>>;
       if (status === 'approved' && formData) {
         await saveDraftEvent(
           editingEvent.id,
@@ -244,6 +300,7 @@ export function DraftEventsPage() {
           lineup: parseLineupText(formData.lineup),
           eventGenres: formData.genres,
         });
+        await persistPromotion(editingEvent.id, formData.is_promoted);
       } else {
         djs = await updateDraftStatus(editingEvent.id, status);
       }
@@ -268,7 +325,8 @@ export function DraftEventsPage() {
         ...formDataToUpdatePayload(data),
         raw_data: rawDataAfterSave(editingEvent, options),
       };
-      const { djs } = await publishDraftEvent(merged);
+      const { eventId, djs } = await publishDraftEvent(merged);
+      await persistPromotion(editingEvent.id, data.is_promoted, eventId);
       notify(formatDraftPublishMessage(1, djs), 'success');
       await refreshAfterAction();
     });
@@ -347,6 +405,23 @@ export function DraftEventsPage() {
         err instanceof Error ? err.message : 'Scraper failed to start.',
         'error',
       );
+    }
+  };
+
+  const handleTogglePromoted = async (
+    rowId: string,
+    eventId: string,
+    next: boolean,
+  ) => {
+    setPromotingId(eventId);
+    try {
+      await setEventPromoted(eventId, next);
+      patchPromotion(rowId, eventId, next);
+      notify(next ? 'Event promoted.' : 'Promotion removed.', 'success');
+    } catch (err) {
+      notify(formatPostgrestError(err), 'error');
+    } finally {
+      setPromotingId(null);
     }
   };
 
@@ -524,6 +599,12 @@ export function DraftEventsPage() {
       {refWarning && !isLoading && (
         <p className={styles.warning}>{refWarning}</p>
       )}
+      {promotionLoaded && !columnReady && !isLoading && (
+        <p className={styles.warning}>{promotedColumnMissingMessage()}</p>
+      )}
+      {promotionError && !isLoading && (
+        <p className={styles.warning}>{promotionError}</p>
+      )}
 
       {!isLoading && !error && rlsBlocked && (
         <div className={styles.rlsBox}>
@@ -541,7 +622,11 @@ export function DraftEventsPage() {
       {!isLoading && !error && !rlsBlocked && filteredEvents.length === 0 && (
         <p className={styles.state}>
           No {activeTab} draft events
-          {filters.search || filters.venueId || filters.genre || filters.sourceId
+          {filters.search ||
+          filters.venueId ||
+          filters.genre ||
+          filters.sourceId ||
+          filters.promoted !== 'all'
             ? ' match your filters'
             : ''}
           .
@@ -557,16 +642,42 @@ export function DraftEventsPage() {
 
       {!isLoading && !error && filteredEvents.length > 0 && (
         <div className={styles.grid}>
-          {filteredEvents.map((event) => (
-            <DraftEventCard
-              key={event.id}
-              event={event}
-              maps={maps}
-              selected={selectedIds.has(event.id)}
-              onSelect={toggleSelect}
-              onEdit={setEditingEvent}
-            />
-          ))}
+          {filteredEvents.map((event) => {
+            const promotion = promotions.get(event.id);
+            const editingThis = editingEvent?.id === event.id;
+            const promoteDisabled =
+              !columnReady || !promotion || editingThis;
+            return (
+              <DraftEventCard
+                key={event.id}
+                event={event}
+                maps={maps}
+                selected={selectedIds.has(event.id)}
+                promoted={promotion?.isPromoted === true}
+                promoteDisabled={promoteDisabled}
+                promoteBusy={promotingId === promotion?.eventId}
+                promoteTitle={
+                  editingThis
+                    ? 'Use the Promoted checkbox in the editor.'
+                    : !columnReady
+                      ? 'Run the is_promoted migration before using this.'
+                      : promotion
+                        ? 'Pin this event to the top of Tonight. The scraper will not change it.'
+                        : 'Publish this event before promoting it.'
+                }
+                onTogglePromoted={(checked) => {
+                  if (!promotion) return;
+                  void handleTogglePromoted(
+                    event.id,
+                    promotion.eventId,
+                    checked,
+                  );
+                }}
+                onSelect={toggleSelect}
+                onEdit={setEditingEvent}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -579,8 +690,9 @@ export function DraftEventsPage() {
         onCreate={handleCreate}
       />
 
-      {editingEvent && (
+      {editingEvent && promotionLoaded && (
         <DraftEventEditor
+          key={editingEvent.id}
           event={editingEvent}
           venues={venues}
           open={!!editingEvent}
@@ -591,6 +703,10 @@ export function DraftEventsPage() {
           onReject={() => handleStatusChange('rejected')}
           onPending={() => handleStatusChange('pending')}
           onPublish={handlePublish}
+          isPromoted={promotions.get(editingEvent.id)?.isPromoted === true}
+          promotionLoaded={promotionLoaded}
+          columnReady={columnReady}
+          hasPublishedEventRow={promotions.has(editingEvent.id)}
         />
       )}
 

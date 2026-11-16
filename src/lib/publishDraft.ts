@@ -5,6 +5,7 @@ import {
   type EnsureLineupDjsResult,
 } from './lineupDjEnsure';
 import { formatPostgrestError } from './supabaseErrors';
+import { withoutPromotedFlag } from './eventPromoted';
 import type { DraftEvent } from '../types/database';
 
 /**
@@ -93,7 +94,10 @@ export function normalizeEventPrice(
   return parsePrice(String(price));
 }
 
-/** Payload aligned with public.events, including the draft back-reference. */
+/**
+ * Payload aligned with public.events, including the draft back-reference.
+ * `is_promoted` is omitted on purpose: republish must not clear a manual pin.
+ */
 export function buildPublishedEventPayload(draft: DraftEvent) {
   return {
     source_id: draft.source_id,
@@ -175,7 +179,9 @@ export async function publishDraftRecord(
     throw new Error('Cannot publish: event_date is required.');
   }
 
-  const payload = buildPublishedEventPayload(draft);
+  // Republish updates the live row in place. is_promoted is not part of the
+  // payload, so an admin pin survives a later publish.
+  const payload = withoutPromotedFlag(buildPublishedEventPayload(draft));
   const lineup = payload.lineup ?? [];
 
   const { data: existing, error: findError } = await client

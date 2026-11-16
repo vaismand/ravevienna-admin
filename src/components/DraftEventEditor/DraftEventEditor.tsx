@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type {
   DraftEvent,
   DraftEventFormData,
@@ -12,7 +12,7 @@ import { EventDjSelect } from '../EventDjSelect/EventDjSelect';
 import { StatusBadge } from '../StatusBadge/StatusBadge';
 import styles from './DraftEventEditor.module.css';
 
-function toFormData(event: DraftEvent): DraftEventFormData {
+function toFormData(event: DraftEvent, isPromoted: boolean): DraftEventFormData {
   return {
     title: event.title ?? '',
     venue_id: event.venue_id,
@@ -27,6 +27,7 @@ function toFormData(event: DraftEvent): DraftEventFormData {
     ticket_url: event.ticket_url ?? '',
     ticketswap_url: event.ticketswap_url ?? '',
     external_url: event.external_url ?? '',
+    is_promoted: isPromoted,
   };
 }
 
@@ -41,6 +42,10 @@ interface DraftEventEditorProps {
   onReject: () => Promise<void>;
   onPending: () => Promise<void>;
   onPublish: (data: DraftEventFormData) => Promise<void>;
+  isPromoted: boolean;
+  promotionLoaded: boolean;
+  columnReady: boolean;
+  hasPublishedEventRow: boolean;
 }
 
 export function DraftEventEditor({
@@ -54,8 +59,14 @@ export function DraftEventEditor({
   onReject,
   onPending,
   onPublish,
+  isPromoted,
+  promotionLoaded,
+  columnReady,
+  hasPublishedEventRow,
 }: DraftEventEditorProps) {
-  const [form, setForm] = useState<DraftEventFormData>(() => toFormData(event));
+  const [form, setForm] = useState<DraftEventFormData>(() =>
+    toFormData(event, isPromoted),
+  );
   const {
     activeDjs,
     selectedDjIds,
@@ -64,9 +75,11 @@ export function DraftEventEditor({
     hasPublishedEvent,
   } = useEventDjSelection(open, event.source_id, event.external_id);
 
-  useEffect(() => {
-    if (open) setForm(toFormData(event));
-  }, [open, event]);
+  const promotedHint = !columnReady
+    ? 'Run the is_promoted migration before using this. The scraper will never set it.'
+    : hasPublishedEventRow
+      ? 'Pins this event to the top of Tonight. A few per day, per genre, is enough. Saving here is the only thing that changes it.'
+      : 'Publish the event to save this. It is stored on the live event, and a re-scrape will not clear it.';
 
   if (!open) return null;
 
@@ -96,6 +109,9 @@ export function DraftEventEditor({
             form={form}
             onChange={setForm}
             venues={venues}
+            showPromoted
+            promotedDisabled={!promotionLoaded || !columnReady}
+            promotedHint={promotedHint}
           />
           <EventDjSelect
             activeDjs={activeDjs}

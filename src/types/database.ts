@@ -74,6 +74,8 @@ export interface Event {
   external_url: string | null;
   external_id: string | null;
   draft_event_id?: string | null;
+  /** Manual Tonight pin. Absent until the is_promoted migration runs. */
+  is_promoted?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -92,6 +94,8 @@ export interface DraftEventFormData {
   ticket_url: string;
   ticketswap_url: string;
   external_url: string;
+  /** Written to the published events row, never to draft_events. */
+  is_promoted: boolean;
 }
 
 export interface DraftEventFilters {
@@ -100,6 +104,7 @@ export interface DraftEventFilters {
   genre: string;
   sourceId: string;
   search: string;
+  promoted: 'all' | 'promoted' | 'not';
 }
 
 export interface EventSubmission {
@@ -127,12 +132,15 @@ export interface EventSubmissionFormData {
   description: string;
   lineup: string;
   contact: string;
+  /** Written to the published events row, never to event_submissions. */
+  is_promoted: boolean;
 }
 
 export interface SubmissionFilters {
   venueName: string;
   genre: string;
   search: string;
+  promoted: 'all' | 'promoted' | 'not';
 }
 
 export type ReferenceMaps = {

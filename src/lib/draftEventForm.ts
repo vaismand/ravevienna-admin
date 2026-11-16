@@ -15,6 +15,7 @@ export const EMPTY_DRAFT_FORM: DraftEventFormData = {
   ticket_url: '',
   ticketswap_url: '',
   external_url: '',
+  is_promoted: false,
 };
 
 export function validateDraftForm(

@@ -123,6 +123,7 @@ function mergeRawData(
  * blank scraped field keeps the stored value (manual edits, Resident Advisor,
  * an earlier scrape). A real scraped value still wins, including a flyer that
  * replaces a favicon. New drafts are unchanged: blank fields stay null.
+ * `is_promoted` is not a draft column and is never a top-level field here.
  */
 export function buildDraftRow(
   source: ScrapeSource,
