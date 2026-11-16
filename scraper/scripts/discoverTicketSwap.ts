@@ -12,6 +12,8 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+import { withoutPromotedFlag } from "../../src/lib/eventPromoted.ts";
+
 import { loadScriptEnv } from "../../scripts/lib/loadEnv.ts";
 import { getTodayDateKey, toDateKey } from "../../scripts/lib/dates.ts";
 import { emptyToNull, isTicketSwapUrl } from "../../src/lib/ticketswapUrl.ts";
@@ -188,7 +190,12 @@ async function applyPlan(
     }
     const { data, error } = await supabase
       .from("events")
-      .update({ ticketswap_url: plan.eventUrl, updated_at: updatedAt })
+      .update(
+        withoutPromotedFlag({
+          ticketswap_url: plan.eventUrl,
+          updated_at: updatedAt,
+        }),
+      )
       .eq("id", target.eventId)
       .is("ticketswap_url", null)
       .select("id");

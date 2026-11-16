@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import { loadScriptEnv } from "../../scripts/lib/loadEnv.ts";
 import { isPastViennaDate } from "../../scripts/lib/dates.ts";
+import { withoutPromotedFlag } from "../../src/lib/eventPromoted.ts";
 import { isSoldOutManuallySet } from "../../src/lib/soldOutManual.ts";
 import {
   buildDraftRow,
@@ -193,6 +194,7 @@ async function upsertDraftEvents(
   const liveEventsResult = supabase
     ? await supabase
         .from("events")
+        // is_promoted is manual. Do not select it into a row that gets written back.
         .select("id, external_id, title, event_date, venue_id, sold_out")
         .eq("source_id", source.id)
     : { data: [], error: null };
@@ -315,7 +317,7 @@ async function upsertDraftEvents(
   for (const patch of soldOutPatches) {
     const { error: eventSoldOutError } = await supabase
       .from("events")
-      .update({ sold_out: patch.sold_out })
+      .update(withoutPromotedFlag({ sold_out: patch.sold_out }))
       .eq("id", patch.eventId);
 
     if (eventSoldOutError) {
@@ -349,9 +351,12 @@ async function upsertDraftEvents(
     return;
   }
 
-  const { error } = await supabase.from("draft_events").upsert(rowsToUpsert, {
-    onConflict: "source_id,external_id",
-  });
+  const { error } = await supabase
+    .from("draft_events")
+    .upsert(
+      rowsToUpsert.map((row) => withoutPromotedFlag(row)),
+      { onConflict: "source_id,external_id" },
+    );
 
   if (error) {
     console.error(`Upsert failed for ${source.name}:`, error);

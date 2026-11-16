@@ -1,17 +1,24 @@
 import type { EventSubmissionFormData, Venue } from '../../types/database';
 import { GenreMultiSelect } from '../GenreMultiSelect/GenreMultiSelect';
+import { PromotedControl } from '../PromotedControl/PromotedControl';
 import styles from './SubmissionFormFields.module.css';
 
 interface SubmissionFormFieldsProps {
   form: EventSubmissionFormData;
   onChange: (form: EventSubmissionFormData) => void;
   venues: Venue[];
+  showPromoted?: boolean;
+  promotedDisabled?: boolean;
+  promotedHint?: string;
 }
 
 export function SubmissionFormFields({
   form,
   onChange,
   venues,
+  showPromoted = false,
+  promotedDisabled = false,
+  promotedHint,
 }: SubmissionFormFieldsProps) {
   const update = <K extends keyof EventSubmissionFormData>(
     key: K,
@@ -109,6 +116,16 @@ export function SubmissionFormFields({
           }
         />
       </label>
+
+      {showPromoted && (
+        <PromotedControl
+          checked={form.is_promoted}
+          disabled={promotedDisabled}
+          hint={promotedHint}
+          ariaLabel="Promoted"
+          onChange={(checked) => update('is_promoted', checked)}
+        />
+      )}
 
       <label className={styles.field}>
         <span className={styles.label}>Contact</span>

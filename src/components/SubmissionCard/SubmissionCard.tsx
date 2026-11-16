@@ -1,5 +1,6 @@
 import { formatDate, formatTime } from '../../utils/format';
 import type { EventSubmission } from '../../types/database';
+import { PromotedControl } from '../PromotedControl/PromotedControl';
 import { StatusBadge } from '../StatusBadge/StatusBadge';
 import cardStyles from '../DraftEventCard/DraftEventCard.module.css';
 import styles from './SubmissionCard.module.css';
@@ -7,6 +8,11 @@ import styles from './SubmissionCard.module.css';
 interface SubmissionCardProps {
   submission: EventSubmission;
   selected: boolean;
+  promoted: boolean;
+  promoteDisabled: boolean;
+  promoteBusy: boolean;
+  promoteTitle?: string;
+  onTogglePromoted: (checked: boolean) => void;
   onSelect: (id: string, checked: boolean) => void;
   onEdit: (submission: EventSubmission) => void;
 }
@@ -14,6 +20,11 @@ interface SubmissionCardProps {
 export function SubmissionCard({
   submission,
   selected,
+  promoted,
+  promoteDisabled,
+  promoteBusy,
+  promoteTitle,
+  onTogglePromoted,
   onSelect,
   onEdit,
 }: SubmissionCardProps) {
@@ -24,14 +35,34 @@ export function SubmissionCard({
       className={`${cardStyles.card} ${selected ? cardStyles.selected : ''}`}
     >
       <div className={cardStyles.selectRow}>
-        <input
-          type="checkbox"
-          className={cardStyles.checkbox}
-          checked={selected}
-          onChange={(e) => onSelect(submission.id, e.target.checked)}
-          aria-label={`Select ${submission.title}`}
-        />
-        <StatusBadge status={submission.status} />
+        <div className={cardStyles.selectLeft}>
+          <input
+            type="checkbox"
+            className={cardStyles.checkbox}
+            checked={selected}
+            onChange={(e) => onSelect(submission.id, e.target.checked)}
+            aria-label={`Select ${submission.title}`}
+          />
+          <PromotedControl
+            compact
+            checked={promoted}
+            disabled={promoteDisabled}
+            busy={promoteBusy}
+            title={promoteTitle}
+            ariaLabel={
+              promoted
+                ? `Remove promotion from ${submission.title}`
+                : `Promote ${submission.title}`
+            }
+            onChange={onTogglePromoted}
+          />
+        </div>
+        <div className={cardStyles.badges}>
+          {promoted && (
+            <span className={cardStyles.promotedBadge}>Promoted</span>
+          )}
+          <StatusBadge status={submission.status} />
+        </div>
       </div>
 
       <div className={`${cardStyles.body} ${styles.body}`}>

@@ -13,8 +13,14 @@ import {
 import { matchesSubmissionSearch, submissionToFormData } from '../../lib/submissionForm';
 import { useNotification } from '../../context/NotificationContext';
 import { useEventSubmissions } from '../../hooks/useEventSubmissions';
+import { usePublishedPromotions } from '../../hooks/usePublishedPromotions';
 import { useReferenceData } from '../../hooks/useReferenceData';
 import { syncEventDjsForDraft, updateEventDjs } from '../../lib/eventDjActions';
+import { matchesPromotedFilter } from '../../lib/eventPromoted';
+import {
+  promotedColumnMissingMessage,
+  setEventPromoted,
+} from '../../lib/eventPromotedActions';
 import { formatPostgrestError } from '../../lib/supabaseErrors';
 import type {
   EventSubmission,
@@ -39,6 +45,7 @@ const defaultFilters = (): SubmissionFilters => ({
   venueName: '',
   genre: '',
   search: '',
+  promoted: 'all',
 });
 
 export function SubmissionsPage() {
@@ -48,6 +55,7 @@ export function SubmissionsPage() {
   const [editing, setEditing] = useState<EventSubmission | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [promotingId, setPromotingId] = useState<string | null>(null);
 
   const { notify } = useNotification();
   const { submissions, loading, error, rlsBlocked, meta, reload } =
@@ -59,6 +67,22 @@ export function SubmissionsPage() {
     () => resolveSubmissionSourceId(sources),
     [sources],
   );
+  const promotionLookups = useMemo(
+    () =>
+      submissions.map((submission) => ({
+        rowId: submission.id,
+        sourceId: submissionSourceId,
+        externalId: `submission-${submission.id}`,
+      })),
+    [submissions, submissionSourceId],
+  );
+  const {
+    byRowId: promotions,
+    columnReady,
+    loaded: promotionLoaded,
+    error: promotionError,
+    patchPromotion,
+  } = usePublishedPromotions(promotionLookups);
 
   const filtered = useMemo(() => {
     return submissions.filter((s) => {
@@ -72,9 +96,17 @@ export function SubmissionsPage() {
         return false;
       }
       if (!matchesSubmissionSearch(s, filters.search)) return false;
+      if (
+        !matchesPromotedFilter(
+          promotions.get(s.id)?.isPromoted === true,
+          filters.promoted,
+        )
+      ) {
+        return false;
+      }
       return true;
     });
-  }, [submissions, filters]);
+  }, [submissions, filters, promotions]);
 
   const selectedItems = useMemo(
     () => filtered.filter((s) => selectedIds.has(s.id)),
@@ -109,6 +141,23 @@ export function SubmissionsPage() {
     setEditing(null);
   };
 
+  const persistPromotion = async (
+    rowId: string,
+    isPromoted: boolean,
+    eventId?: string,
+  ) => {
+    if (!columnReady) {
+      if (isPromoted) throw new Error(promotedColumnMissingMessage());
+      return;
+    }
+    const known = promotions.get(rowId);
+    const id = eventId ?? known?.eventId;
+    if (!id) return;
+    if ((known?.isPromoted === true) === isPromoted) return;
+    await setEventPromoted(id, isPromoted);
+    patchPromotion(rowId, id, isPromoted);
+  };
+
   const runWithBusy = async (fn: () => Promise<void>) => {
     setBusy(true);
     try {
@@ -131,7 +180,14 @@ export function SubmissionsPage() {
           djIds,
         );
       }
-      notify('Submission saved.', 'success');
+      const hadLiveEvent = promotions.has(editing.id);
+      await persistPromotion(editing.id, data.is_promoted);
+      notify(
+        data.is_promoted && !hadLiveEvent
+          ? 'Submission saved. Promoted is applied when you publish the event.'
+          : 'Submission saved.',
+        'success',
+      );
       await refreshAfterAction();
     });
   };
@@ -167,9 +223,27 @@ export function SubmissionsPage() {
         submissionSourceId,
       );
       await updateEventDjs(eventId, djIds);
+      await persistPromotion(editing.id, data.is_promoted, eventId);
       notify('Submission published to mobile feed.', 'success');
       await refreshAfterAction();
     });
+  };
+
+  const handleTogglePromoted = async (
+    rowId: string,
+    eventId: string,
+    next: boolean,
+  ) => {
+    setPromotingId(eventId);
+    try {
+      await setEventPromoted(eventId, next);
+      patchPromotion(rowId, eventId, next);
+      notify(next ? 'Event promoted.' : 'Promotion removed.', 'success');
+    } catch (err) {
+      notify(formatPostgrestError(err), 'error');
+    } finally {
+      setPromotingId(null);
+    }
   };
 
   const executeBulkApprove = async () => {
@@ -365,6 +439,12 @@ export function SubmissionsPage() {
       {refWarning && !isLoading && (
         <p className={pageStyles.warning}>{refWarning}</p>
       )}
+      {promotionLoaded && !columnReady && !isLoading && (
+        <p className={pageStyles.warning}>{promotedColumnMissingMessage()}</p>
+      )}
+      {promotionError && !isLoading && (
+        <p className={pageStyles.warning}>{promotionError}</p>
+      )}
 
       {!isLoading && error && rlsBlocked && (
         <div className={pageStyles.rlsBox}>
@@ -400,7 +480,10 @@ export function SubmissionsPage() {
           {meta.totalAccessible === 0
             ? 'No user submissions in the database yet.'
             : `No ${activeTab} user submissions`}
-          {filters.search || filters.venueName || filters.genre
+          {filters.search ||
+          filters.venueName ||
+          filters.genre ||
+          filters.promoted !== 'all'
             ? ' match your filters'
             : ''}
           .
@@ -413,20 +496,42 @@ export function SubmissionsPage() {
 
       {!isLoading && !error && filtered.length > 0 && (
         <div className={pageStyles.grid}>
-          {filtered.map((s) => (
-            <SubmissionCard
-              key={s.id}
-              submission={s}
-              selected={selectedIds.has(s.id)}
-              onSelect={toggleSelect}
-              onEdit={setEditing}
-            />
-          ))}
+          {filtered.map((s) => {
+            const promotion = promotions.get(s.id);
+            const editingThis = editing?.id === s.id;
+            const promoteDisabled = !columnReady || !promotion || editingThis;
+            return (
+              <SubmissionCard
+                key={s.id}
+                submission={s}
+                selected={selectedIds.has(s.id)}
+                promoted={promotion?.isPromoted === true}
+                promoteDisabled={promoteDisabled}
+                promoteBusy={promotingId === promotion?.eventId}
+                promoteTitle={
+                  editingThis
+                    ? 'Use the Promoted checkbox in the editor.'
+                    : !columnReady
+                      ? 'Run the is_promoted migration before using this.'
+                      : promotion
+                        ? 'Pin this event to the top of Tonight. The scraper will not change it.'
+                        : 'Publish this event before promoting it.'
+                }
+                onTogglePromoted={(checked) => {
+                  if (!promotion) return;
+                  void handleTogglePromoted(s.id, promotion.eventId, checked);
+                }}
+                onSelect={toggleSelect}
+                onEdit={setEditing}
+              />
+            );
+          })}
         </div>
       )}
 
-      {editing && (
+      {editing && promotionLoaded && (
         <SubmissionEditor
+          key={editing.id}
           submission={editing}
           venues={venues}
           submissionSourceId={submissionSourceId}
@@ -438,6 +543,10 @@ export function SubmissionsPage() {
           onReject={() => handleStatusChange('rejected')}
           onPending={() => handleStatusChange('pending')}
           onPublish={handlePublish}
+          isPromoted={promotions.get(editing.id)?.isPromoted === true}
+          promotionLoaded={promotionLoaded}
+          columnReady={columnReady}
+          hasPublishedEventRow={promotions.has(editing.id)}
         />
       )}
 

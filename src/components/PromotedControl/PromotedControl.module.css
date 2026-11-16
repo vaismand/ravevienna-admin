@@ -1,0 +1,33 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: #c8d4d4;
+  cursor: pointer;
+}
+
+.compact {
+  font-size: 0.75rem;
+}
+
+.toggle input {
+  accent-color: #ffd84d;
+}
+
+.toggle:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.hint {
+  font-size: 0.72rem;
+  color: #6a7a7a;
+  line-height: 1.35;
+}

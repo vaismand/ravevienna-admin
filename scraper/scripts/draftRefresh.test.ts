@@ -238,4 +238,15 @@ describe("pending draft refresh", () => {
     assert.equal(row.raw_data.ticketswap_url_manual, true);
     assert.equal(row.raw_data.venue, "Das Werk");
   });
+
+  it("never sends is_promoted, even when a scrape mentions it", () => {
+    const row = buildDraftRow(
+      source,
+      scraped({ raw_data: { is_promoted: true, venue: "Das Werk" } }),
+      existing(),
+    );
+
+    assert.equal("is_promoted" in row, false);
+    assert.equal(row.raw_data.is_promoted, true);
+  });
 });

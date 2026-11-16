@@ -186,6 +186,14 @@ describe("published event sold_out", () => {
       }),
       { id: "event-1", sold_out: true },
     );
+    const patch = planPublishedSoldOutUpdate({
+      eventId: "event-1",
+      scrapedSoldOut: true,
+      currentSoldOut: false,
+      draftRawData: { source: "Grelle Forelle" },
+    });
+    assert.deepEqual(Object.keys(patch ?? {}).sort(), ["id", "sold_out"]);
+    assert.equal(patch != null && "is_promoted" in patch, false);
     assert.equal(
       planPublishedSoldOutUpdate({
         eventId: "event-1",

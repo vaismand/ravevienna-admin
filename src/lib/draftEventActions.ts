@@ -29,6 +29,7 @@ function parsePrice(value: string): number | null {
 }
 
 export function formDataToUpdatePayload(data: DraftEventFormData) {
+  // is_promoted is not a draft column. The editor writes it on events only.
   return {
     title: data.title.trim(),
     venue_id: data.venue_id || null,

@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { parseLineupText } from './lineup';
+import { withoutPromotedFlag } from './eventPromoted';
 import { withoutUncollectedEventFields } from './submissionEventWrite';
 import { formatPostgrestError } from './supabaseErrors';
 import { resolveVenueIdFromName } from './venueUtils';
@@ -103,7 +104,7 @@ export async function publishEventSubmission(
   const venue_id = resolveVenueIdFromName(payload.venue_name, venues);
   const external_id = `submission-${submission.id}`;
 
-  const eventPayload = {
+  const eventPayload = withoutPromotedFlag({
     source_id: sourceId,
     venue_id,
     title: payload.title,
@@ -120,7 +121,7 @@ export async function publishEventSubmission(
     image_url: null,
     external_url: payload.event_url,
     external_id,
-  };
+  });
 
   const { data: existing, error: findError } = await supabase
     .from('events')

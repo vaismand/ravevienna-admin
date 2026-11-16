@@ -29,7 +29,11 @@ export function FiltersBar({
   };
 
   const hasActiveFilters =
-    filters.search || filters.venueId || filters.genre || filters.sourceId;
+    filters.search ||
+    filters.venueId ||
+    filters.genre ||
+    filters.sourceId ||
+    filters.promoted !== 'all';
 
   return (
     <div className={styles.bar}>
@@ -97,6 +101,21 @@ export function FiltersBar({
       </div>
 
       <div className={styles.field}>
+        <label className={styles.label}>Promoted</label>
+        <select
+          className={styles.select}
+          value={filters.promoted}
+          onChange={(e) =>
+            update('promoted', e.target.value as DraftEventFilters['promoted'])
+          }
+        >
+          <option value="all">All events</option>
+          <option value="promoted">Promoted</option>
+          <option value="not">Not promoted</option>
+        </select>
+      </div>
+
+      <div className={styles.field}>
         <label className={styles.label}>Source</label>
         <select
           className={styles.select}
@@ -123,6 +142,7 @@ export function FiltersBar({
               venueId: '',
               genre: '',
               sourceId: '',
+              promoted: 'all',
             })
           }
         >

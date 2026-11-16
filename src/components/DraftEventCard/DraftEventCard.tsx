@@ -1,6 +1,7 @@
 import { formatDate, formatPrice, formatTime } from '../../utils/format';
 import { isTicketSwapUrl } from '../../lib/ticketswapUrl';
 import type { DraftEvent, ReferenceMaps } from '../../types/database';
+import { PromotedControl } from '../PromotedControl/PromotedControl';
 import { StatusBadge } from '../StatusBadge/StatusBadge';
 import styles from './DraftEventCard.module.css';
 
@@ -8,6 +9,11 @@ interface DraftEventCardProps {
   event: DraftEvent;
   maps: ReferenceMaps;
   selected: boolean;
+  promoted: boolean;
+  promoteDisabled: boolean;
+  promoteBusy: boolean;
+  promoteTitle?: string;
+  onTogglePromoted: (checked: boolean) => void;
   onSelect: (id: string, checked: boolean) => void;
   onEdit: (event: DraftEvent) => void;
 }
@@ -16,6 +22,11 @@ export function DraftEventCard({
   event,
   maps,
   selected,
+  promoted,
+  promoteDisabled,
+  promoteBusy,
+  promoteTitle,
+  onTogglePromoted,
   onSelect,
   onEdit,
 }: DraftEventCardProps) {
@@ -33,14 +44,32 @@ export function DraftEventCard({
   return (
     <article className={`${styles.card} ${selected ? styles.selected : ''}`}>
       <div className={styles.selectRow}>
-        <input
-          type="checkbox"
-          className={styles.checkbox}
-          checked={selected}
-          onChange={(e) => onSelect(event.id, e.target.checked)}
-          aria-label={`Select ${event.title}`}
-        />
-        <StatusBadge status={event.status} />
+        <div className={styles.selectLeft}>
+          <input
+            type="checkbox"
+            className={styles.checkbox}
+            checked={selected}
+            onChange={(e) => onSelect(event.id, e.target.checked)}
+            aria-label={`Select ${event.title}`}
+          />
+          <PromotedControl
+            compact
+            checked={promoted}
+            disabled={promoteDisabled}
+            busy={promoteBusy}
+            title={promoteTitle}
+            ariaLabel={
+              promoted
+                ? `Remove promotion from ${event.title}`
+                : `Promote ${event.title}`
+            }
+            onChange={onTogglePromoted}
+          />
+        </div>
+        <div className={styles.badges}>
+          {promoted && <span className={styles.promotedBadge}>Promoted</span>}
+          <StatusBadge status={event.status} />
+        </div>
       </div>
 
       <div className={styles.body}>
