@@ -1,4 +1,5 @@
 import {
+  hasHardLineupSeparator,
   isLineupFloorLabel,
   splitLineupCollaborations,
 } from "../../../scripts/lib/lineupArtists.ts";
@@ -133,7 +134,7 @@ function isCreditLine(line: string): boolean {
 }
 
 function isLongProse(line: string): boolean {
-  if (/\bb2b\b|\bf2f\b|\bvs\.?\b/i.test(line)) return false;
+  if (hasHardLineupSeparator(line)) return false;
   if (isCreditLine(line)) return false;
 
   const parts = line
@@ -468,8 +469,8 @@ export function normalizeLineupNames(names: string[]): string[] {
 
 /**
  * Extract DJ names from a lineup section inside event description text.
- * Room and floor headers are removed. b2b / B2B / vs / x / & pairs are split
- * when they are two artists.
+ * Room and floor headers are removed. b2b / B2B / vs / vs. / versus / x / &
+ * pairs are split when they are two artists. Event titles are left alone.
  */
 export function extractLineup(description: string): string[] {
   if (!description?.trim()) {

@@ -453,6 +453,49 @@ describe("publishDraftRecord", () => {
     assert.equal(rows(db, "event_djs").length, 0);
   });
 
+  it("links each side of a vs set and does not create a combined DJ", async () => {
+    const { db, client } = createDb();
+    db.set("draft_events", [{ id: "draft-1", status: "approved" }]);
+
+    await publishDraftRecord(
+      client,
+      draft({
+        title: "DLQNT vs Pamina",
+        lineup: [
+          "DLQNT vs Pamina",
+          "HARDCLIP vs. Brandy",
+          "Jayback VS Delex",
+          "Alpha versus Beta",
+          "VSNS",
+          "Elvs",
+        ],
+      }),
+    );
+
+    const names = [
+      "DLQNT",
+      "Pamina",
+      "HARDCLIP",
+      "Brandy",
+      "Jayback",
+      "Delex",
+      "Alpha",
+      "Beta",
+      "VSNS",
+      "Elvs",
+    ];
+    assert.equal(rows(db, "events")[0]?.title, "DLQNT vs Pamina");
+    assert.deepEqual(
+      rows(db, "djs").map((row) => row.name),
+      names,
+    );
+    assert.deepEqual(linkedNames(db), names);
+    assert.equal(
+      rows(db, "djs").some((row) => /\svs\.?\s|\sversus\s/i.test(String(row.name))),
+      false,
+    );
+  });
+
   it("links both DJs in a b2b set and skips floor labels", async () => {
     const { db, client } = createDb();
     db.set("draft_events", [{ id: "draft-1", status: "approved" }]);
@@ -595,6 +638,31 @@ describe("lineup names and slugs", () => {
 });
 
 describe("in-memory client in()", () => {
+  it("splits vs pairs when draft approval creates DJs", async () => {
+    const { db, client } = createDb();
+    db.set("draft_events", [
+      {
+        id: "d1",
+        lineup: ["DLQNT vs Pamina", "HARDCLIP versus Brandy", "VSNS"],
+        genres: ["Techno"],
+      },
+    ]);
+
+    const result = await ensureDjsFromDraftLineups(client, ["d1"]);
+
+    assert.deepEqual(result.created, [
+      "DLQNT",
+      "Pamina",
+      "HARDCLIP",
+      "Brandy",
+      "VSNS",
+    ]);
+    assert.deepEqual(
+      rows(db, "djs").map((row) => row.name),
+      ["DLQNT", "Pamina", "HARDCLIP", "Brandy", "VSNS"],
+    );
+  });
+
   it("imports DJs only from the requested draft ids", async () => {
     const { db, client } = createDb();
     db.set("draft_events", [
