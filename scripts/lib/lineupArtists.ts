@@ -2,8 +2,25 @@
  * Lineup artist parsing shared by the scraper and admin DJ import.
  */
 
-const COLLABORATION_SEPARATOR =
-  /\s+(b2b|f2f|back[\s-]?to[\s-]?back|vs\.?|x|&)\s+/i;
+/**
+ * Standalone billed-pair tokens. Whitespace is required on both sides, so a
+ * name that merely contains those letters (`VSNS`, `Elvs`) is not a pair.
+ * `versus` is listed before `vs` so the longer word is one token, and a
+ * trailing dot (`vs.`, `versus.`) belongs to that token.
+ */
+const VS_TOKEN_SOURCE = String.raw`versus\.?|vs\.?`;
+
+const HARD_SEPARATOR_SOURCE =
+  String.raw`b2b|f2f|back[\s-]?to[\s-]?back|${VS_TOKEN_SOURCE}`;
+
+const COLLABORATION_SEPARATOR = new RegExp(
+  String.raw`\s+(${HARD_SEPARATOR_SOURCE}|x|&)\s+`,
+  "i",
+);
+
+const HARD_SEPARATOR = new RegExp(String.raw`^(?:${HARD_SEPARATOR_SOURCE})$`, "i");
+
+const VS_SEPARATOR = new RegExp(String.raw`^(?:${VS_TOKEN_SOURCE})$`, "i");
 
 /**
  * One act whose name contains "&" or "and". Splitting these would invent
@@ -26,6 +43,33 @@ function looksLikeArtistSide(value: string): boolean {
   return clean.split(/\s+/).length <= 5;
 }
 
+function isHardSeparator(separator: string): boolean {
+  return HARD_SEPARATOR.test(separator);
+}
+
+function isVsSeparator(separator: string): boolean {
+  return VS_SEPARATOR.test(separator);
+}
+
+/**
+ * True when this separator sits inside a known duo (`Camo & Krooked`),
+ * so a later `vs` does not break the duo into two stored names.
+ */
+function separatorCutsKnownDuo(
+  value: string,
+  start: number,
+  end: number,
+): boolean {
+  const lower = value.toLowerCase();
+  for (const artist of COMPOUND_ARTISTS) {
+    const at = lower.indexOf(artist);
+    if (at < 0) continue;
+    const artistEnd = at + artist.length;
+    if (start < artistEnd && end > at) return true;
+  }
+  return false;
+}
+
 function separatorIsTwoArtists(separator: string, left: string, right: string): boolean {
   if (/^x$/i.test(separator)) {
     if (
@@ -37,6 +81,15 @@ function separatorIsTwoArtists(separator: string, left: string, right: string): 
     }
   }
   return looksLikeArtistSide(left) && looksLikeArtistSide(right);
+}
+
+/**
+ * True when a line contains a standalone b2b / f2f / vs / versus token.
+ * Used to keep a billed pair from being discarded as prose. Event titles
+ * are not passed through here.
+ */
+export function hasHardLineupSeparator(value: string): boolean {
+  return new RegExp(String.raw`\b(?:${HARD_SEPARATOR_SOURCE})\b`, "i").test(value);
 }
 
 /** Normalize whitespace and invisible characters for matching. */
@@ -51,28 +104,102 @@ function lineupDedupeKey(name: string): string {
   return normalizeLineupArtistName(name).toLowerCase();
 }
 
+type CollaborationSplit = {
+  left: string;
+  right: string;
+  separator: string;
+};
+
+function findCollaborationSplit(
+  clean: string,
+  options?: { skipVs?: boolean },
+): CollaborationSplit | null {
+  const re = new RegExp(COLLABORATION_SEPARATOR.source, "gi");
+  let soft: CollaborationSplit | null = null;
+
+  for (const match of clean.matchAll(re)) {
+    if (match.index == null) continue;
+
+    const separator = match[1] ?? "";
+    const splitEnd = match.index + match[0].length;
+    if (options?.skipVs && isVsSeparator(separator)) continue;
+    if (options?.skipVs && separatorCutsKnownDuo(clean, match.index, splitEnd)) {
+      continue;
+    }
+
+    const left = normalizeLineupArtistName(clean.slice(0, match.index));
+    const right = normalizeLineupArtistName(clean.slice(splitEnd));
+    if (!left || !right || !separatorIsTwoArtists(separator, left, right)) {
+      continue;
+    }
+
+    const point = { left, right, separator };
+    // b2b / vs / versus win over an earlier `x` or `&` that also qualifies,
+    // so a pair is not left glued together behind another separator.
+    if (isHardSeparator(separator)) return point;
+    if (!soft) soft = point;
+  }
+
+  return soft;
+}
+
 /**
- * Split a billed pair into individual artists.
- * `b2b` / `B2B` / `f2f` / `vs` always split. Spaced `x` and `&` split only
- * when both sides are artist names. A letter inside a word (`Axel`, `R&B`)
- * is not a separator, and known duo names stay intact.
+ * Rewrite a standalone `vs` / `vs.` / `versus` token to `vs`.
+ * The token needs whitespace on both sides, so `VSNS`, `Elvs`, and
+ * `Foo vs.Bar` stay intact. This does not split the lineup row.
+ */
+export function normalizeVsLineupEntry(name: string): string {
+  const clean = normalizeLineupArtistName(name);
+  if (!clean) return "";
+  const vsToken = new RegExp(String.raw`\s+(?:${VS_TOKEN_SOURCE})\s+`, "gi");
+  return clean.replace(vsToken, " vs ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Lineup rows to store. `vs` / `vs.` / `versus` stay one element, with the
+ * token written as `vs`, including chains (`X vs Y vs Z`). `b2b`, `f2f`,
+ * `x`, and `&` still split the way they do today. Known duos stay intact.
+ * DJ linking uses `splitLineupCollaborations` on the resulting text, so
+ * each side of a kept `vs` row is still its own DJ.
+ */
+export function lineupEntriesForStorage(name: string): string[] {
+  const clean = normalizeLineupArtistName(name);
+  if (!clean) return [];
+  if (COMPOUND_ARTISTS.has(clean.toLowerCase())) {
+    return [normalizeVsLineupEntry(clean)];
+  }
+
+  const split = findCollaborationSplit(clean, { skipVs: true });
+  if (!split) return [normalizeVsLineupEntry(clean)];
+
+  return [
+    ...lineupEntriesForStorage(split.left),
+    ...lineupEntriesForStorage(split.right),
+  ];
+}
+
+/**
+ * Individual DJ names inside one billed row, left then right.
+ * Used when matching and linking DJs, not when writing `events.lineup`.
+ * `b2b` / `B2B` / `f2f` / `vs` / `vs.` / `versus` split the same way: the
+ * token must have whitespace on both sides, and both sides must look like
+ * artist names. A chain (`X b2b Y b2b Z`, `X vs Y vs Z`) yields every
+ * member. Spaced `x` and `&` split only in that artist case. A letter
+ * inside a word (`Axel`, `VSNS`, `Elvs`, `R&B`) is not a separator, and
+ * known duo names stay intact. Event titles are not split here.
  */
 export function splitLineupCollaborations(name: string): string[] {
   const clean = normalizeLineupArtistName(name);
   if (!clean) return [];
   if (COMPOUND_ARTISTS.has(clean.toLowerCase())) return [clean];
 
-  const match = COLLABORATION_SEPARATOR.exec(clean);
-  if (!match || match.index == null) return [clean];
+  const split = findCollaborationSplit(clean);
+  if (!split) return [clean];
 
-  const left = normalizeLineupArtistName(clean.slice(0, match.index));
-  const right = normalizeLineupArtistName(clean.slice(match.index + match[0].length));
-  const separator = match[1] ?? "";
-  if (!left || !right || !separatorIsTwoArtists(separator, left, right)) {
-    return [clean];
-  }
-
-  return [...splitLineupCollaborations(left), ...splitLineupCollaborations(right)];
+  return [
+    ...splitLineupCollaborations(split.left),
+    ...splitLineupCollaborations(split.right),
+  ];
 }
 
 /**
@@ -114,8 +241,9 @@ export function escapeIlikePattern(value: string): string {
 }
 
 /**
- * Prepare scraped lineup strings for DJ import:
- * drop floors/stages, split B2B/F2F sets, dedupe by normalized name.
+ * Prepare lineup strings for DJ import and `event_djs` links:
+ * drop floors/stages, split b2b / vs / versus sets into one name per DJ,
+ * dedupe by normalized name. The stored lineup row can still be `X vs Y`.
  */
 export function prepareLineupForDjImport(lineup: string[]): string[] {
   const seen = new Set<string>();

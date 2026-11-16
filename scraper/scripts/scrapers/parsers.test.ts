@@ -33,6 +33,14 @@ describe("shared lineup normalization", () => {
       "Hagen Wings",
     ]);
     assert.deepEqual(splitLineupCollaborations("Left vs Right"), ["Left", "Right"]);
+    assert.deepEqual(splitLineupCollaborations("DLQNT vs Pamina"), [
+      "DLQNT",
+      "Pamina",
+    ]);
+    assert.deepEqual(splitLineupCollaborations("HARDCLIP versus Brandy"), [
+      "HARDCLIP",
+      "Brandy",
+    ]);
     assert.deepEqual(splitLineupCollaborations("Sub Focus x Dimension"), [
       "Sub Focus",
       "Dimension",
@@ -45,6 +53,47 @@ describe("shared lineup normalization", () => {
       "Dead End Showcase X GDN",
     ]);
     assert.deepEqual(normalizeLineupNames(["LaLa"]), ["LaLa"]);
+    assert.deepEqual(
+      normalizeLineupNames([
+        "DLQNT vs Pamina",
+        "HARDCLIP vs. Brandy",
+        "Jayback VS Delex",
+        "Alpha versus Beta",
+        "Alpha versus Beta versus Gamma",
+        "Left vs Right b2b Third",
+        "VSNS",
+        "Elvs",
+        "Rantom b2b SODA",
+      ]),
+      [
+        "DLQNT vs Pamina",
+        "HARDCLIP vs Brandy",
+        "Jayback vs Delex",
+        "Alpha vs Beta",
+        "Alpha vs Beta vs Gamma",
+        "Left vs Right",
+        "Third",
+        "VSNS",
+        "Elvs",
+        "Rantom",
+        "SODA",
+      ],
+    );
+  });
+
+  it("keeps a vs pair as one lineup row and leaves a title alone", () => {
+    assert.deepEqual(
+      extractLineup(
+        "DLQNT vs Pamina\n\nLineup:\nHARDCLIP vs Brandy\nJayback vs. Delex\nVSNS\nElvs\nNova versus Pulse",
+      ),
+      [
+        "HARDCLIP vs Brandy",
+        "Jayback vs Delex",
+        "VSNS",
+        "Elvs",
+        "Nova vs Pulse",
+      ],
+    );
   });
 
   it("splits a floor that sits in the middle of a one-line bill", () => {

@@ -256,8 +256,10 @@ export async function ensureDjsFromDraftLineups(
 
 /**
  * DJ ids for the same names `ensureDjsFromLineup` creates, in that order.
- * Floor labels are dropped and b2b / f2f / vs / & sets are split first.
- * The same DJ is linked once; names that do not resolve are skipped.
+ * Floor labels are dropped and b2b / f2f / vs / versus / & sets are split
+ * into one id per member, including chains of three or more. The stored
+ * lineup row can still be `X vs Y` or `X b2b Y`. The same DJ is linked
+ * once; names that do not resolve are skipped.
  */
 export async function resolveLineupDjIds(
   client: SupabaseClient,
