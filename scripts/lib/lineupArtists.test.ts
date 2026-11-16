@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  lineupEntriesForStorage,
+  normalizeVsLineupEntry,
   prepareLineupForDjImport,
   splitLineupCollaborations,
 } from "./lineupArtists.ts";
@@ -171,5 +173,56 @@ describe("prepareLineupForDjImport", () => {
         "Elvs",
       ],
     );
+  });
+
+  it("links every member of a b2b or vs chain", () => {
+    assert.deepEqual(
+      prepareLineupForDjImport([
+        "Alpha b2b Beta b2b Gamma",
+        "One versus Two vs. Three",
+        "Left vs Right b2b Third",
+      ]),
+      ["Alpha", "Beta", "Gamma", "One", "Two", "Three", "Left", "Right", "Third"],
+    );
+  });
+});
+
+describe("stored lineup rows", () => {
+  it("keeps a vs pair as one row and writes the token as vs", () => {
+    assert.equal(normalizeVsLineupEntry("HARDCLIP vs. Brandy"), "HARDCLIP vs Brandy");
+    assert.equal(normalizeVsLineupEntry("Jayback VS Delex"), "Jayback vs Delex");
+    assert.equal(normalizeVsLineupEntry("Alpha versus Beta"), "Alpha vs Beta");
+    assert.equal(
+      normalizeVsLineupEntry("  DLQNT   versus.   Pamina  "),
+      "DLQNT vs Pamina",
+    );
+    assert.equal(normalizeVsLineupEntry("VSNS"), "VSNS");
+    assert.equal(normalizeVsLineupEntry("Elvs"), "Elvs");
+    assert.equal(normalizeVsLineupEntry("Foo vs.Bar"), "Foo vs.Bar");
+    assert.equal(normalizeVsLineupEntry("versusly Named"), "versusly Named");
+    assert.equal(normalizeVsLineupEntry("Rantom b2b SODA"), "Rantom b2b SODA");
+
+    assert.deepEqual(lineupEntriesForStorage("DLQNT vs Pamina"), [
+      "DLQNT vs Pamina",
+    ]);
+    assert.deepEqual(lineupEntriesForStorage("Alpha versus Beta versus Gamma"), [
+      "Alpha vs Beta vs Gamma",
+    ]);
+    assert.deepEqual(lineupEntriesForStorage("Camo & Krooked vs Someone"), [
+      "Camo & Krooked vs Someone",
+    ]);
+    assert.deepEqual(lineupEntriesForStorage("Left vs Right b2b Third"), [
+      "Left vs Right",
+      "Third",
+    ]);
+    assert.deepEqual(lineupEntriesForStorage("Alpha b2b Beta b2b Gamma"), [
+      "Alpha",
+      "Beta",
+      "Gamma",
+    ]);
+    assert.deepEqual(lineupEntriesForStorage("Sub Focus x Dimension"), [
+      "Sub Focus",
+      "Dimension",
+    ]);
   });
 });

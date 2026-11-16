@@ -322,6 +322,13 @@ describe("stored lineup keeps stage markers", () => {
     assert.deepEqual(lineupToTextArray(JSON.stringify(lineup)), lineup);
   });
 
+  it("rewrites versus to vs in a saved lineup row and leaves b2b together", () => {
+    assert.deepEqual(
+      parseLineupText("Alpha versus Beta\nRantom b2b SODA\n[MAINFLOOR]"),
+      ["Alpha vs Beta", "Rantom b2b SODA", "[MAINFLOOR]"],
+    );
+  });
+
   it("lets DJ import skip markers and split b2b without changing the stored array", () => {
     const stored = [...lineup];
     assert.deepEqual(prepareLineupForDjImport(stored), [

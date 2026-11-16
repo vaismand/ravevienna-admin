@@ -273,6 +273,23 @@ describe("publish payload conversion", () => {
     assert.deepEqual(lineupToTextArray('["A","B"]'), ["A", "B"]);
   });
 
+  it("rewrites vs. and versus to vs without splitting the row or a b2b", () => {
+    assert.deepEqual(
+      lineupToTextArray([
+        "HARDCLIP vs. Brandy",
+        "Alpha VERSUS Beta versus Gamma",
+        "Rantom b2b SODA",
+        "VSNS",
+      ]),
+      [
+        "HARDCLIP vs Brandy",
+        "Alpha vs Beta vs Gamma",
+        "Rantom b2b SODA",
+        "VSNS",
+      ],
+    );
+  });
+
   it("keeps [room] stage markers in the stored lineup", () => {
     assert.deepEqual(
       lineupToTextArray([
@@ -485,6 +502,14 @@ describe("publishDraftRecord", () => {
       "Elvs",
     ];
     assert.equal(rows(db, "events")[0]?.title, "DLQNT vs Pamina");
+    assert.deepEqual(rows(db, "events")[0]?.lineup, [
+      "DLQNT vs Pamina",
+      "HARDCLIP vs Brandy",
+      "Jayback vs Delex",
+      "Alpha vs Beta",
+      "VSNS",
+      "Elvs",
+    ]);
     assert.deepEqual(
       rows(db, "djs").map((row) => row.name),
       names,
@@ -521,6 +546,44 @@ describe("publishDraftRecord", () => {
       "Annakonda B2B Stendhal Syndrome",
       "KITCHEN Hosted By Bassbussi",
     ]);
+  });
+
+  it("links every member of a b2b or vs chain and keeps the billing string", async () => {
+    const { db, client } = createDb();
+    db.set("draft_events", [{ id: "draft-1", status: "approved" }]);
+
+    await publishDraftRecord(
+      client,
+      draft({
+        lineup: [
+          "Alpha b2b Beta b2b Gamma",
+          "DLQNT versus Pamina vs. Brandy",
+          "Left vs Right b2b Third",
+        ],
+      }),
+    );
+
+    const names = [
+      "Alpha",
+      "Beta",
+      "Gamma",
+      "DLQNT",
+      "Pamina",
+      "Brandy",
+      "Left",
+      "Right",
+      "Third",
+    ];
+    assert.deepEqual(rows(db, "events")[0]?.lineup, [
+      "Alpha b2b Beta b2b Gamma",
+      "DLQNT vs Pamina vs Brandy",
+      "Left vs Right b2b Third",
+    ]);
+    assert.deepEqual(
+      rows(db, "djs").map((row) => row.name),
+      names,
+    );
+    assert.deepEqual(linkedNames(db), names);
   });
 
   it("keeps existing event_djs when the lineup resolves no DJs", async () => {

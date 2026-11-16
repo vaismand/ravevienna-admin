@@ -59,30 +59,40 @@ describe("shared lineup normalization", () => {
         "HARDCLIP vs. Brandy",
         "Jayback VS Delex",
         "Alpha versus Beta",
+        "Alpha versus Beta versus Gamma",
+        "Left vs Right b2b Third",
         "VSNS",
         "Elvs",
+        "Rantom b2b SODA",
       ]),
       [
-        "DLQNT",
-        "Pamina",
-        "HARDCLIP",
-        "Brandy",
-        "Jayback",
-        "Delex",
-        "Alpha",
-        "Beta",
+        "DLQNT vs Pamina",
+        "HARDCLIP vs Brandy",
+        "Jayback vs Delex",
+        "Alpha vs Beta",
+        "Alpha vs Beta vs Gamma",
+        "Left vs Right",
+        "Third",
         "VSNS",
         "Elvs",
+        "Rantom",
+        "SODA",
       ],
     );
   });
 
-  it("splits vs pairs inside a lineup block and leaves a title alone", () => {
+  it("keeps a vs pair as one lineup row and leaves a title alone", () => {
     assert.deepEqual(
       extractLineup(
         "DLQNT vs Pamina\n\nLineup:\nHARDCLIP vs Brandy\nJayback vs. Delex\nVSNS\nElvs\nNova versus Pulse",
       ),
-      ["HARDCLIP", "Brandy", "Jayback", "Delex", "VSNS", "Elvs", "Nova", "Pulse"],
+      [
+        "HARDCLIP vs Brandy",
+        "Jayback vs Delex",
+        "VSNS",
+        "Elvs",
+        "Nova vs Pulse",
+      ],
     );
   });
 

@@ -6,6 +6,7 @@ import {
 } from './lineupDjEnsure';
 import { formatPostgrestError } from './supabaseErrors';
 import { withoutPromotedFlag } from './eventPromoted';
+import { normalizeVsLineupEntry } from '../../scripts/lib/lineupArtists';
 import type { DraftEvent } from '../types/database';
 
 /**
@@ -29,6 +30,8 @@ export function genresJsonToTextArray(genres: unknown): string[] {
 /**
  * Lineup is one stored row per array element.
  * `[MAINFLOOR]`-style stage markers stay in the array; DJ import skips them later.
+ * `vs.` / `versus` are rewritten to `vs` so `X vs Y` stays one row.
+ * `X b2b Y` is left as one row too. Member DJs are linked separately.
  */
 export function lineupToTextArray(lineup: unknown): string[] {
   if (lineup == null) return [];
@@ -36,7 +39,7 @@ export function lineupToTextArray(lineup: unknown): string[] {
   if (Array.isArray(lineup)) {
     return lineup
       .filter((item): item is string => typeof item === 'string')
-      .map((item) => item.trim())
+      .map((item) => normalizeVsLineupEntry(item))
       .filter(Boolean);
   }
 
@@ -51,7 +54,8 @@ export function lineupToTextArray(lineup: unknown): string[] {
         // Fall through and treat the string as a single name.
       }
     }
-    return [trimmed];
+    const entry = normalizeVsLineupEntry(trimmed);
+    return entry ? [entry] : [];
   }
 
   return [];

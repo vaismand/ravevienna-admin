@@ -1,7 +1,7 @@
 import {
   hasHardLineupSeparator,
   isLineupFloorLabel,
-  splitLineupCollaborations,
+  lineupEntriesForStorage,
 } from "../../../scripts/lib/lineupArtists.ts";
 
 const LINEUP_HEADER_REGEX =
@@ -442,8 +442,10 @@ export function htmlToStructuredText(raw: string): string {
 }
 
 /**
- * Drop room headers, unnamed floor markers, and junk, then split billed pairs.
- * Every source runs its lineup through this so a fix applies everywhere.
+ * Drop room headers, unnamed floor markers, and junk, then split billed pairs
+ * that are stored as separate rows. `vs` / `vs.` / `versus` stay one row,
+ * rewritten as `vs`. `b2b` / `f2f` / `x` / `&` still split. Every source runs
+ * its lineup through this so a fix applies everywhere.
  */
 export function normalizeLineupNames(names: string[]): string[] {
   const seen = new Set<string>();
@@ -454,7 +456,7 @@ export function normalizeLineupNames(names: string[]): string[] {
     const cleaned = cleanArtistToken(raw);
     if (!cleaned || isLineupFloorLabel(cleaned)) continue;
 
-    for (const artist of splitLineupCollaborations(cleaned)) {
+    for (const artist of lineupEntriesForStorage(cleaned)) {
       const name = cleanArtistToken(artist) ?? artist;
       if (!name || isLineupFloorLabel(name)) continue;
       const key = name.toLowerCase();
@@ -469,8 +471,9 @@ export function normalizeLineupNames(names: string[]): string[] {
 
 /**
  * Extract DJ names from a lineup section inside event description text.
- * Room and floor headers are removed. b2b / B2B / vs / vs. / versus / x / &
- * pairs are split when they are two artists. Event titles are left alone.
+ * Room and floor headers are removed. b2b / B2B / x / & pairs are split
+ * when they are two artists. vs / vs. / versus stay one row, written as
+ * `vs`. Event titles are left alone.
  */
 export function extractLineup(description: string): string[] {
   if (!description?.trim()) {
