@@ -1,18 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
 
 import { loadScriptEnv } from "../../scripts/lib/loadEnv.ts";
-import { normalizeEventGenres } from "../../scripts/lib/genres.ts";
 import { getTodayDateKey, parseDateKey, toDateKey } from "../../scripts/lib/dates.ts";
 import { isSoldOutManuallySet } from "../../src/lib/soldOutManual.ts";
 import {
-  planPublishedSoldOutUpdate,
-  scrapedSoldOutForDraft,
-} from "./soldOutSync.ts";
-
-loadScriptEnv();
-import { enrichEventText } from "./scrapers/lineup";
+  buildDraftRow,
+  EXISTING_DRAFT_COLUMNS,
+  type ExistingDraftRow,
+} from "./draftRefresh.ts";
+import { planPublishedSoldOutUpdate } from "./soldOutSync.ts";
 import { scrapers } from "./scrapers";
 import type { ScrapedEvent, ScrapeSource } from "./scrapers/types";
+
+loadScriptEnv();
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
@@ -31,14 +31,6 @@ const PROTECTED_DRAFT_STATUSES = new Set([
 ]);
 
 /* ----------------------------- DATABASE ----------------------------- */
-
-type ExistingDraftRow = {
-  external_id: string;
-  lineup: string[] | null;
-  status: string;
-  raw_data: Record<string, unknown> | null;
-  sold_out: boolean | null;
-};
 
 type LiveEventRow = {
   id: string;
@@ -79,46 +71,6 @@ function isPastEventDate(eventDate: string | null): boolean {
   return eventDay.getTime() < today.getTime();
 }
 
-function buildDraftRow(
-  source: ScrapeSource,
-  event: ScrapedEvent,
-  existing: ExistingDraftRow | undefined
-) {
-  const enriched = enrichEventText(event.description);
-  const existingLineup = Array.isArray(existing?.lineup) ? existing.lineup : [];
-  const lineup =
-    enriched.lineup.length > 0 ? enriched.lineup : existingLineup;
-  const soldOut = scrapedSoldOutForDraft({
-    scrapedSoldOut: event.sold_out === true,
-    existingRawData: existing?.raw_data,
-    existingSoldOut: existing?.sold_out,
-  });
-
-  return {
-    source_id: source.id,
-    venue_id: source.venue_id,
-    title: event.title,
-    event_date: event.event_date,
-    start_time: event.start_time,
-    price: event.price,
-    sold_out: soldOut.soldOut,
-    genres: normalizeEventGenres(event.genres),
-    description: enriched.description,
-    lineup,
-    ticket_url: event.ticket_url,
-    image_url: event.image_url,
-    external_url: event.external_url,
-    external_id: event.external_id,
-    status: "pending" as const,
-    confidence: event.event_date ? 0.8 : 0.35,
-    raw_data: {
-      ...event.raw_data,
-      extracted_lineup: enriched.lineup,
-      ...(soldOut.preserveManual ? { sold_out_manual: true } : {}),
-    },
-  };
-}
-
 async function upsertDraftEvents(source: ScrapeSource, events: ScrapedEvent[]) {
   const upcomingEvents = events.filter(
     (event) => !isPastEventDate(event.event_date)
@@ -140,7 +92,7 @@ async function upsertDraftEvents(source: ScrapeSource, events: ScrapedEvent[]) {
   ] = await Promise.all([
     supabase
       .from("draft_events")
-      .select("external_id, lineup, status, raw_data, sold_out")
+      .select(EXISTING_DRAFT_COLUMNS)
       .eq("source_id", source.id)
       .in("external_id", externalIds),
     supabase

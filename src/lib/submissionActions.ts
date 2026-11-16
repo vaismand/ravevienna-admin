@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { parseLineupText } from './lineup';
+import { withoutUncollectedEventFields } from './submissionEventWrite';
 import { formatPostgrestError } from './supabaseErrors';
 import { resolveVenueIdFromName } from './venueUtils';
 import type {
@@ -135,7 +136,7 @@ export async function publishEventSubmission(
   if (existing?.id) {
     const { error: updateError } = await supabase
       .from('events')
-      .update(eventPayload)
+      .update(withoutUncollectedEventFields(eventPayload))
       .eq('id', existing.id);
     if (updateError) throw new Error(formatPostgrestError(updateError));
     eventId = existing.id;
