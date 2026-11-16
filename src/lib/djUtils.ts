@@ -92,8 +92,8 @@ export function djFormToPayload(data: DjFormData) {
     spotify_url: trimOrNull(data.spotify_url),
     website_url: trimOrNull(data.website_url),
     image_url: trimOrNull(data.image_url),
-    city: trimOrNull(data.city) ?? 'Vienna',
-    country: trimOrNull(data.country) ?? 'Austria',
+    city: trimOrNull(data.city),
+    country: trimOrNull(data.country),
     is_active: data.is_active,
     updated_at: new Date().toISOString(),
   };
@@ -110,8 +110,8 @@ export function djToFormData(dj: Dj): DjFormData {
     spotify_url: dj.spotify_url ?? '',
     website_url: dj.website_url ?? '',
     image_url: dj.image_url ?? '',
-    city: dj.city ?? 'Vienna',
-    country: dj.country ?? 'Austria',
+    city: dj.city ?? '',
+    country: dj.country ?? '',
     is_active: dj.is_active ?? true,
   };
 }

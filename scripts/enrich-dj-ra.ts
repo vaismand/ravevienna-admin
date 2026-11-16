@@ -522,8 +522,8 @@ async function createDj(
     spotify_url: null,
     website_url: null,
     image_url: updates.image_url ?? null,
-    city: "",
-    country: updates.country ?? "",
+    city: null,
+    country: updates.country ?? null,
     is_active: true,
     ...updates,
   };

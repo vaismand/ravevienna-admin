@@ -10,7 +10,7 @@ export const EMPTY_DJ_FORM: DjFormData = {
   spotify_url: '',
   website_url: '',
   image_url: '',
-  city: 'Vienna',
-  country: 'Austria',
+  city: '',
+  country: '',
   is_active: true,
 };

@@ -320,6 +320,10 @@ describe("publishDraftRecord", () => {
       ["Alice", "Bob"],
     );
     assert.equal(djsTable.every((row) => row.is_active === false), true);
+    assert.equal(
+      djsTable.every((row) => row.city === null && row.country === null),
+      true,
+    );
     assert.deepEqual(djs.created, ["Alice", "Bob"]);
 
     const links = rows(db, "event_djs");
@@ -580,5 +584,7 @@ describe("in-memory client in()", () => {
       rows(db, "djs").map((row) => row.name),
       ["Only One"],
     );
+    assert.equal(rows(db, "djs")[0]?.city, null);
+    assert.equal(rows(db, "djs")[0]?.country, null);
   });
 });
