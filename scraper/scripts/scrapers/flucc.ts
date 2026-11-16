@@ -138,6 +138,18 @@ function parseFluccPrice(priceText: string): number | null {
   return parseMoneyToken(priceText);
 }
 
+/**
+ * Each Wagtail block is its own paragraph. Joining with `.text()` glues
+ * "ALET" and "ARAS" into "ALETARAS".
+ */
+export function readFluccDescription($: cheerio.CheerioAPI): string {
+  return $(".event-main-col .entry-content p[data-block-key]")
+    .map((_, el) => cleanText($(el).text()))
+    .get()
+    .filter(Boolean)
+    .join("\n");
+}
+
 function extractTicketUrl($: cheerio.CheerioAPI) {
   const ticketLink = $("a.btn")
     .filter((_, el) => cleanText($(el).text()).toLowerCase().includes("ticket"))
@@ -156,9 +168,7 @@ async function scrapeFluccDetail(eventUrl: string) {
   const timeText = cleanText($(".more-info .time").first().text()).replace(" Uhr", "");
   const location = cleanText($(".more-info .location").first().text()).replace("@", "");
 
-  const description = cleanText(
-    $(".event-main-col .entry-content p[data-block-key]").text()
-  );
+  const description = readFluccDescription($);
 
   const image =
     $(".gallery img").first().attr("src") ||

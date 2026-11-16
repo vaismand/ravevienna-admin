@@ -165,14 +165,20 @@ async function enrichTicketShop(ticketUrl: string | null): Promise<TicketEnrichm
   return null;
 }
 
-function parseGrelleDateFromTitle(title: string): string | null {
+function parseGrelleDateFromTitle(title: string, today = new Date()): string | null {
   const match = title.match(/(\d{1,2})\/(\d{1,2})/);
 
   if (!match) return null;
 
   const day = match[1].padStart(2, "0");
   const month = match[2].padStart(2, "0");
-  const year = "2026";
+  let year = today.getFullYear();
+  const candidate = new Date(`${year}-${month}-${day}T12:00:00`);
+
+  // "10/02" in January is next year's February, not last February.
+  if (candidate.getTime() < today.getTime() - 30 * 24 * 60 * 60 * 1000) {
+    year += 1;
+  }
 
   return `${year}-${month}-${day}`;
 }
@@ -280,7 +286,11 @@ export async function scrapeGrelleForelle(
 
   const urls = new Set<string>();
 
-  $(".et_pb_portfolio_item.project_category_club").each((_, element) => {
+  $(".et_pb_portfolio_item").each((_, element) => {
+    const className = $(element).attr("class") ?? "";
+    // Divi has used both project_category_club and project_category-club.
+    if (!/(?:^|\s)project_category[-_]club(?:\s|$)/.test(className)) return;
+
     const href = $(element).find("a[href*='/project/']").first().attr("href");
     if (!href) return;
 

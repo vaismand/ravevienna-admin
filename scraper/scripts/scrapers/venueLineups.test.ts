@@ -88,16 +88,14 @@ function textChunk(id: string, text: string): string {
   return `${id}:T${Buffer.byteLength(text).toString(16)},${text}`;
 }
 
-describe("room tags in extracted lineups", () => {
-  it("keeps Grelle FISH MARKET rooms and drops the door text", () => {
+describe("lineups are DJ names only", () => {
+  it("drops Grelle FISH MARKET rooms and the door text", () => {
     const text = htmlToStructuredText(FISH_MARKET_HTML);
     assert.match(text, /MAINFLOOR\n+ALTINBAS/);
     assert.deepEqual(extractLineup(text), [
-      "[MAINFLOOR]",
       "ALTINBAS",
       "Annika Stein",
       "Gerald VDH",
-      "[KITCHEN hosted by LuvAffair]",
       "Lim Banda",
       "Sabina",
       "Ernst",
@@ -107,28 +105,25 @@ describe("room tags in extracted lineups", () => {
   it("does not glue a room onto the next DJ or leak entry DOORS", () => {
     assert.deepEqual(
       extractLineup("lineup\nMAINFLOOR\nErnst entry DOORS 23:00\nPRE SALE"),
-      ["[MAINFLOOR]", "Ernst"],
+      ["Ernst"],
     );
   });
 
-  it("turns Das Werk Main Floor and Luster Floor sections into tags", () => {
+  it("drops Das Werk floor headers and splits b2b", () => {
     assert.deepEqual(extractLineup(CREEDS_DESCRIPTION), [
-      "[MAIN FLOOR]",
       "CREEDS",
       "Arman Shadow",
       "DJ Wolle",
-      "Rantom b2b SODA",
-      "[LUSTER FLOOR]",
+      "Rantom",
+      "SODA",
       "MUSA",
       "ADANA",
       "ADRIALIN",
     ]);
     assert.deepEqual(extractLineup(RESIDENT_DESCRIPTION), [
-      "[MAIN FLOOR]",
       "DETOXX",
       "GOLPE",
       "DJ WIFI",
-      "[LUSTER FLOOR]",
       "KINGSMO",
       "NIKLIST",
       "ARMAN SHADOW",
@@ -136,37 +131,43 @@ describe("room tags in extracted lineups", () => {
     ]);
   });
 
-  it("keeps a b2b set as one element and tags prose floor sections", () => {
+  it("splits prose-floor b2b sets into separate DJs", () => {
     assert.deepEqual(extractLineup(DEAD_END_DESCRIPTION), [
-      "[MAINFLOOR]",
       "Paralich",
       "THIRD 2HIFT",
-      "Valenthin b2b SAYA",
-      "[SECOND FLOOR]",
+      "Valenthin",
+      "SAYA",
       "catercarlo",
       "DJ WIFI",
       "KRISTUS",
-      "LUZZT b2b ANER",
+      "LUZZT",
+      "ANER",
       "Rantom",
     ]);
   });
 
-  it("emits Loft per-DJ floors as [OBEN], [UNTEN], and [WOHNZIMMER]", () => {
+  it("splits a one-line Loft bill and drops Oben, Unten, and Wohnzimmer", () => {
     assert.deepEqual(extractLineup(`Lineup:\n${LOFT_BASSBUSSI}`), [
-      "[OBEN]",
-      "Andrew Ahmed b2b Sluzy",
-      "Partypauli b2b Maro",
-      "Arman Shadow b2b Leanne",
-      "[UNTEN]",
-      "Ave Maria b2b Christella",
-      "Wo.Izzy b2b DJ Parkverbot",
-      "Aschenbrenner b2b Zeq",
-      "Anatol b2b Pink Lotion",
+      "Andrew Ahmed",
+      "Sluzy",
+      "Partypauli",
+      "Maro",
+      "Arman Shadow",
+      "Leanne",
+      "Ave Maria",
+      "Christella",
+      "Wo.Izzy",
+      "DJ Parkverbot",
+      "Aschenbrenner",
+      "Zeq",
+      "Anatol",
+      "Pink Lotion",
     ]);
-    assert.deepEqual(
-      extractLineup("Lineup:\nWohnzimmer: Ada, Ben b2b Cee"),
-      ["[WOHNZIMMER]", "Ada", "Ben b2b Cee"],
-    );
+    assert.deepEqual(extractLineup("Lineup:\nWohnzimmer: Ada, Ben b2b Cee"), [
+      "Ada",
+      "Ben",
+      "Cee",
+    ]);
   });
 });
 
@@ -267,15 +268,15 @@ describe("Das Werk club nights", () => {
       true,
     );
     assert.deepEqual(extractLineup(deadEnd?.description ?? ""), [
-      "[MAINFLOOR]",
       "Paralich",
       "THIRD 2HIFT",
-      "Valenthin b2b SAYA",
-      "[SECOND FLOOR]",
+      "Valenthin",
+      "SAYA",
       "catercarlo",
       "DJ WIFI",
       "KRISTUS",
-      "LUZZT b2b ANER",
+      "LUZZT",
+      "ANER",
       "Rantom",
     ]);
   });

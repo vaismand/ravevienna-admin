@@ -11,7 +11,71 @@ import { RequestPacer, ResponseCache } from "./responseCache.ts";
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
 
-const ENDPOINT = "https://ra.co/graphql";
+export const RA_GRAPHQL_ENDPOINT = "https://ra.co/graphql";
+
+const RA_GRAPHQL_HEADERS = {
+  "User-Agent": USER_AGENT,
+  Accept: "application/json",
+  "Content-Type": "application/json",
+  Origin: "https://ra.co",
+  Referer: "https://ra.co/",
+  "ra-content-language": "en",
+};
+
+/**
+ * POST the public GraphQL endpoint the RA site uses. Shared by DJ enrichment
+ * and the Vienna event scraper. A 403/429 is returned as an error, not thrown.
+ */
+export async function postRaGraphql(
+  fetchImpl: FetchLike,
+  operationName: string,
+  query: string,
+  variables: Record<string, unknown>,
+): Promise<{ payload: unknown | null; error: string | null }> {
+  let response: Response;
+  try {
+    response = await fetchImpl(RA_GRAPHQL_ENDPOINT, {
+      method: "POST",
+      headers: RA_GRAPHQL_HEADERS,
+      body: JSON.stringify({ operationName, query, variables }),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { payload: null, error: `RA request failed: ${message}` };
+  }
+
+  if (response.status === 403 || response.status === 429) {
+    return {
+      payload: null,
+      error: `RA returned ${response.status}. Artist search was skipped for this DJ.`,
+    };
+  }
+
+  const text = await response.text();
+  if (!response.ok) {
+    return {
+      payload: null,
+      error: `RA returned ${response.status}. Artist search was skipped for this DJ.`,
+    };
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(text) as unknown;
+  } catch {
+    return { payload: null, error: "RA returned invalid JSON" };
+  }
+
+  const record = asRecord(payload);
+  const data = record?.data;
+  const errors = record?.errors;
+  if (!data && Array.isArray(errors) && errors.length > 0) {
+    const message = asString(asRecord(errors[0])?.message) ?? "RA GraphQL error";
+    return { payload: null, error: message };
+  }
+
+  return { payload, error: null };
+}
 
 const SEARCH_QUERY = `query SearchArtists($searchTerm: String, $limit: Int, $indices: [IndexType!]) {
   search(searchTerm: $searchTerm, limit: $limit, indices: $indices) {
@@ -308,57 +372,16 @@ export class RaArtistClient {
 
     await this.options.pacer?.wait();
 
-    let response: Response;
-    try {
-      response = await this.fetchImpl(ENDPOINT, {
-        method: "POST",
-        headers: {
-          "User-Agent": USER_AGENT,
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          Origin: "https://ra.co",
-          Referer: "https://ra.co/",
-          "ra-content-language": "en",
-        },
-        body,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return { payload: null, error: `RA request failed: ${message}` };
+    const result = await postRaGraphql(
+      this.fetchImpl,
+      operationName,
+      query,
+      variables,
+    );
+    if (result.payload) {
+      await this.options.cache?.set(cacheKey, JSON.stringify(result.payload));
     }
-
-    if (response.status === 403 || response.status === 429) {
-      return {
-        payload: null,
-        error: `RA returned ${response.status}. Artist search was skipped for this DJ.`,
-      };
-    }
-
-    const text = await response.text();
-    if (!response.ok) {
-      return {
-        payload: null,
-        error: `RA returned ${response.status}. Artist search was skipped for this DJ.`,
-      };
-    }
-
-    let payload: unknown;
-    try {
-      payload = JSON.parse(text) as unknown;
-    } catch {
-      return { payload: null, error: "RA returned invalid JSON" };
-    }
-
-    const record = asRecord(payload);
-    const data = record?.data;
-    const errors = record?.errors;
-    if (!data && Array.isArray(errors) && errors.length > 0) {
-      const message = asString(asRecord(errors[0])?.message) ?? "RA GraphQL error";
-      return { payload: null, error: message };
-    }
-
-    await this.options.cache?.set(cacheKey, text);
-    return { payload, error: null };
+    return result;
   }
 
   async searchArtists(name: string, limit = 5): Promise<RaSearchResult> {

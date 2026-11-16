@@ -115,36 +115,137 @@ function parseArenaPrice(description: string): number | null {
   return parsed.length > 0 ? Math.min(...parsed) : null;
 }
 
-function isRelevantArenaEvent(event: {
+/**
+ * Promoters, labels, and artists that identify a rave when the Arena page
+ * never says the genre. Kept specific so a pop or metal bill does not match.
+ */
+const ARENA_RAVE_SIGNALS = [
+  "eatbrain",
+  "camo & krooked",
+  "camo and krooked",
+  "mefjus",
+  "black sun empire",
+  "noisia",
+  "drumcode",
+  "hospital records",
+  "critical music",
+  "metalheadz",
+  "shogun audio",
+  "let it roll",
+  "urban art forms",
+  "mainframe",
+];
+
+const ARENA_GENRE_KEYWORDS = [
+  "drum and bass",
+  "drum & bass",
+  "dnb",
+  "d&b",
+  "techno",
+  "hard techno",
+  "rave",
+  "hardstyle",
+  "psytrance",
+  "trance",
+  "tekno",
+  "hardcore",
+  "gabber",
+  "jungle",
+  "breakbeat",
+  "tech house",
+  "electro",
+];
+
+const ARENA_CONCERT_KEYWORDS = [
+  "punk",
+  "rock",
+  "metal",
+  "indie",
+  "singer-songwriter",
+  "pop",
+  "hip-hop",
+  "hip hop",
+  "rap",
+  "jazz",
+  "classical",
+  "folk",
+  "schlager",
+  "kabarett",
+  "comedy",
+  "wrestling",
+];
+
+function arenaTextHasWord(text: string, keyword: string): boolean {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(
+    `(?:^|[^\\p{L}\\p{N}])${escaped.replace(/\s+/g, "\\s+")}(?:[^\\p{L}\\p{N}]|$)`,
+    "iu",
+  ).test(text);
+}
+
+function arenaGenreText(text: string): string {
+  return text
+    .replace(/drum\s*-\s*&\s*-\s*bass/gi, "drum and bass")
+    .replace(/drum\s*&\s*bass/gi, "drum and bass");
+}
+
+export function isRelevantArenaEvent(event: {
   title: string;
   description: string;
   startTime: string;
 }) {
-  const text = `${event.title} ${event.description}`.toLowerCase();
+  const raw = `${event.title} ${event.description}`.toLowerCase();
+  const text = arenaGenreText(raw);
   const startHour = Number(event.startTime.split(":")[0]);
 
-  const startsLikeClubNight = startHour >= 21 || startHour <= 4;
+  // Morning and early-afternoon bills (kids shows, matinees) are not club nights.
+  // Open-air raves such as Camo & Krooked at 19:00 still qualify.
+  if (Number.isFinite(startHour) && startHour >= 6 && startHour < 16) {
+    return false;
+  }
 
-  const hasClubMusicKeyword =
-    text.includes("drum & bass") ||
-    text.includes("drum and bass") ||
-    text.includes("dnb") ||
-    text.includes("d&b") ||
-    text.includes("rave") ||
-    text.includes("techno") ||
-    text.includes("clubnight") ||
-    text.includes("bass music") ||
-    text.includes("hard dance") ||
-    text.includes("psytrance");
+  const knownSignal = ARENA_RAVE_SIGNALS.some((signal) =>
+    arenaTextHasWord(text, signal),
+  );
+  // "COLLAPS" is a different band. Only the whole word is the Vienna DnB night.
+  const collapseNight = /\bcollapse\b/i.test(text);
+  const genre = ARENA_GENRE_KEYWORDS.some((keyword) =>
+    arenaTextHasWord(text, keyword),
+  );
 
-  const obviousConcertOnly =
-    text.includes("punk") ||
-    text.includes("rock") ||
-    text.includes("metal") ||
-    text.includes("indie") ||
-    text.includes("singer-songwriter");
+  if (knownSignal || collapseNight) return true;
+  if (!genre) return false;
 
-  return startsLikeClubNight && hasClubMusicKeyword && !obviousConcertOnly;
+  const concert = ARENA_CONCERT_KEYWORDS.some((keyword) =>
+    arenaTextHasWord(text, keyword),
+  );
+  return !concert;
+}
+
+export function readArenaRelevanceFromHtml(html: string): {
+  title: string;
+  startTime: string | null;
+  relevant: boolean;
+} {
+  const $ = cheerio.load(html);
+  const title =
+    cleanText($("#dnn_ctr577_ViewEventDetail_hl_ConcertTitle").text()) ||
+    cleanText($("meta[name='og:title']").attr("content") ?? "");
+  const metaDescription = cleanText($("meta[name='og:description']").attr("content") ?? "");
+  const description = cleanText($(".suite_VAdescr").text()) || metaDescription;
+  const parsed = parseArenaDate(metaDescription || description);
+
+  return {
+    title,
+    startTime: parsed.startTime,
+    relevant:
+      Boolean(parsed.startTime) &&
+      isRelevantArenaEvent({
+        title,
+        description,
+        startTime: parsed.startTime ?? "",
+      }),
+  };
 }
 
 function extractTicketUrl($: cheerio.CheerioAPI) {

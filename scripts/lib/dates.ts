@@ -1,3 +1,24 @@
+/** Calendar day in Vienna as YYYY-MM-DD. Event dates are compared in this zone. */
+export function getViennaDateKey(reference: Date = new Date()): string {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Europe/Vienna",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(reference);
+}
+
+/** True when the event day is strictly before today in Vienna. Blank dates are not past. */
+export function isPastViennaDate(
+  eventDate: string | null | undefined,
+  today: string = getViennaDateKey(),
+): boolean {
+  if (!eventDate?.trim()) return false;
+  const key = toDateKey(eventDate);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return false;
+  return key < today;
+}
+
 /** Local calendar day as YYYY-MM-DD (device timezone). */
 export function getTodayDateKey(reference: Date = new Date()): string {
   const year = reference.getFullYear();

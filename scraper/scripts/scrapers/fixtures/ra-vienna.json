@@ -1,0 +1,87 @@
+{
+  "data": {
+    "eventListings": {
+      "totalResults": 5,
+      "data": [
+        {
+          "id": "1",
+          "listingDate": "2026-11-20T00:00:00.000",
+          "event": {
+            "id": "1001",
+            "title": "SYNERGY RAVE x Trance + Hard Techno",
+            "date": "2026-11-20T00:00:00.000",
+            "startTime": "2026-11-20T23:00:00.000",
+            "endTime": "2026-11-21T06:00:00.000",
+            "contentUrl": "/events/1001",
+            "flyerFront": null,
+            "cost": "10 / 18",
+            "images": [{ "filename": "https://images.ra.co/synergy.jpg", "type": "FLYERFRONT" }],
+            "venue": { "id": "1", "name": "Das Werk" },
+            "artists": [
+              { "name": "Dimitrios (2)" },
+              { "name": "Valenthin b2b SAYA" },
+              { "name": "Camo & Krooked" }
+            ],
+            "promoters": [{ "name": "Tickets" }],
+            "genres": [{ "name": "Trance" }, { "name": "Techno" }],
+            "pick": { "blurb": "Trance and hard techno at Das Werk." }
+          }
+        },
+        {
+          "id": "2",
+          "event": {
+            "id": "1002",
+            "title": "COLLAPSE - EATBRAIN NIGHT",
+            "date": "2027-02-06T00:00:00.000",
+            "startTime": "2027-02-06T22:00:00.000",
+            "endTime": "2027-02-07T06:00:00.000",
+            "contentUrl": "/events/1002",
+            "cost": "€18",
+            "images": [{ "filename": "https://images.ra.co/collapse.jpg", "type": "FLYERFRONT" }],
+            "venue": { "id": "2", "name": "Arena Wien" },
+            "artists": [{ "name": "Mefjus" }],
+            "promoters": [{ "name": "Collapse" }],
+            "genres": [{ "name": "Drum & Bass" }]
+          }
+        },
+        {
+          "id": "3",
+          "event": {
+            "id": "1003",
+            "title": "Hayao Miyazaki's Dreams",
+            "startTime": "2026-11-20T20:00:00.000",
+            "contentUrl": "/events/1003",
+            "cost": "25 — 55",
+            "venue": { "name": "Paulanerkirche, Vienna" },
+            "artists": [],
+            "genres": [{ "name": "Classical" }]
+          }
+        },
+        {
+          "id": "4",
+          "event": {
+            "id": "1004",
+            "title": "Techno at O-Club",
+            "startTime": "2026-11-21T23:00:00.000",
+            "contentUrl": "/events/1004",
+            "venue": { "name": "O-Club" },
+            "artists": [{ "name": "Some DJ" }],
+            "genres": [{ "name": "Techno" }]
+          }
+        },
+        {
+          "id": "5",
+          "event": {
+            "id": "1005",
+            "title": "Old rave",
+            "startTime": "2020-01-01T23:00:00.000",
+            "contentUrl": "/events/1005",
+            "venue": { "name": "Flex" },
+            "artists": [{ "name": "Old DJ" }],
+            "genres": [{ "name": "Techno" }]
+          }
+        }
+      ]
+    }
+  }
+}

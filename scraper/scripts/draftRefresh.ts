@@ -1,5 +1,5 @@
 import { normalizeEventGenres } from "../../scripts/lib/genres.ts";
-import { enrichEventText } from "./scrapers/lineup.ts";
+import { enrichEventText, normalizeLineupNames } from "./scrapers/lineup.ts";
 import type { ScrapedEvent, ScrapeSource } from "./scrapers/types.ts";
 import { scrapedSoldOutForDraft } from "./soldOutSync.ts";
 
@@ -85,6 +85,15 @@ function preferImage(
   return null;
 }
 
+export function venueIdForDraft(source: ScrapeSource, event: ScrapedEvent): string | null {
+  const fromEvent = event.raw_data.venue_id;
+  if (typeof fromEvent === "string" && fromEvent.trim()) return fromEvent.trim();
+  if (typeof event.raw_data.venue_name === "string" && event.raw_data.venue_name.trim()) {
+    return null;
+  }
+  return source.venue_id?.trim() || null;
+}
+
 function stringList(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter(
@@ -121,7 +130,9 @@ export function buildDraftRow(
   existing: ExistingDraftRow | undefined,
 ) {
   const enriched = enrichEventText(event.description);
-  const lineup = preferScraped(enriched.lineup, stringList(existing?.lineup));
+  const explicitLineup = normalizeLineupNames(event.lineup ?? []);
+  const scrapedLineup = explicitLineup.length > 0 ? explicitLineup : enriched.lineup;
+  const lineup = preferScraped(scrapedLineup, stringList(existing?.lineup));
   const eventDate = preferScraped(event.event_date, existing?.event_date ?? null);
   const soldOut = scrapedSoldOutForDraft({
     scrapedSoldOut: event.sold_out === true,
@@ -131,7 +142,7 @@ export function buildDraftRow(
 
   return {
     source_id: source.id,
-    venue_id: source.venue_id,
+    venue_id: venueIdForDraft(source, event),
     title: preferScraped(event.title, existing?.title ?? null),
     event_date: eventDate,
     start_time: preferScraped(event.start_time, existing?.start_time ?? null),
@@ -150,7 +161,7 @@ export function buildDraftRow(
     status: "pending" as const,
     confidence: eventDate?.trim() ? 0.8 : 0.35,
     raw_data: mergeRawData(existing?.raw_data, event.raw_data, {
-      extracted_lineup: enriched.lineup,
+      extracted_lineup: scrapedLineup,
       ...(soldOut.preserveManual ? { sold_out_manual: true } : {}),
     }),
   };
