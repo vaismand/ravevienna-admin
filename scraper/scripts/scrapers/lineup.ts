@@ -1,4 +1,7 @@
-import { isLineupFloorLabel } from "../../../scripts/lib/lineupArtists.ts";
+import {
+  isLineupFloorLabel,
+  splitLineupCollaborations,
+} from "../../../scripts/lib/lineupArtists.ts";
 
 const LINEUP_HEADER_REGEX =
   /^(?:line[\s-]?up|artists?|djs?|acts?|with|w\/)\s*:?\s*$/i;
@@ -103,7 +106,7 @@ function isStopLine(line: string): boolean {
   const clean = stripDecorations(line);
   if (!clean) return false;
   if (
-    /^(?:tickets?|doors?|entry|admission|presale|pre[\s-]*sale|box office|location|venue|address|awareness|hardfacts|no place|no photo|respect the club|earlybird|limited pre|stay hard|(?:graphics|visuals|photos?)\s+by)\b/i.test(
+    /^(?:tickets?|doors?|entry|admission|presale|pre[\s-]*sale|box office|location|venue|address|awareness|hardfacts|no place|no photo|respect the club|earlybird|limited pre|stay hard|art program|exhibiting artists|presented by|highlights of|(?:graphics|visuals|photos?)\s+by)\b/i.test(
       clean
     )
   ) {
@@ -116,10 +119,33 @@ function isStopLine(line: string): boolean {
   return false;
 }
 
+/** A credit row (label path, aka, parenthetical country) is not a paragraph. */
+function isCreditLine(line: string): boolean {
+  const clean = stripDecorations(line);
+  if (!clean) return false;
+  if (/^[▶►▴▲✓✔]/.test(clean)) return true;
+  if (/\baka\b/i.test(clean)) return true;
+  if ((clean.match(/\//g) ?? []).length >= 1 && clean.split(/\s+/).length <= 16) {
+    return true;
+  }
+  if (/\([^)]*\)/.test(clean) && clean.split(/\s+/).length <= 14) return true;
+  return false;
+}
+
 function isLongProse(line: string): boolean {
+  if (/\bb2b\b|\bf2f\b|\bvs\.?\b/i.test(line)) return false;
+  if (isCreditLine(line)) return false;
+
+  const parts = line
+    .split(/[,;•·|]/)
+    .map((part) => stripDecorations(part))
+    .filter(Boolean);
+  if (parts.length >= 2 && parts.every((part) => part.split(/\s+/).length <= 6)) {
+    return false;
+  }
+
   const words = stripDecorations(line).split(/\s+/).filter(Boolean);
   if (words.length < 7) return false;
-  if (/\bb2b\b|\bf2f\b/i.test(line)) return false;
   return true;
 }
 
@@ -136,7 +162,10 @@ function proseRoomLabel(line: string): string | null {
 function splitByRoomMarkers(
   line: string
 ): { room: string; body: string }[] | null {
-  const re = new RegExp(`(?:^|\\.\\s*)(${ROOM_CORE})\\s*:?`, "giu");
+  const re = new RegExp(
+    `(?:^|\\.\\s*|\\s)(${ROOM_CORE})\\s*:`,
+    "giu",
+  );
   const matches = [...line.matchAll(re)].filter((match) => {
     const at = match.index ?? 0;
     const hasColon = /:\s*$/.test(match[0] ?? "");
@@ -163,19 +192,60 @@ function splitByRoomMarkers(
   });
 }
 
+/** "Name / Label / GER" keeps the artist. A slash-separated label chain does not. */
+function stripLabelSuffix(name: string): string {
+  if (
+    /\bhosted\s+by\b/i.test(name) &&
+    /\b(?:house|techno|dubstep|ukg|dnb|trance|garage)\b/i.test(name)
+  ) {
+    return "";
+  }
+
+  const parts = name
+    .split(/\s*\/\s*/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length < 2) return name;
+
+  const labelWord =
+    /\b(?:records?|audio|sounds|tunes|tools|music|ballroom|drumcode|hospital|parade|calling)\b/i;
+  const head = parts[0] ?? "";
+  const tail = parts.slice(1).join(" / ");
+  if (/\baka\b/i.test(head)) return head;
+
+  const headWords = head.split(/\s+/).filter(Boolean);
+  const billed =
+    headWords.length >= 2 ||
+    /^[\p{Lu}0-9][\p{Lu}0-9 .'+!_-]*$/u.test(head);
+  const tailIsSecondAct =
+    parts.length === 2 &&
+    /^[\p{Lu}0-9][\p{Lu}0-9 .'+!_-]*$/u.test(parts[1] ?? "");
+  if (billed && !labelWord.test(head) && !tailIsSecondAct) return head;
+  if (!labelWord.test(tail)) return name;
+
+  if (parts.length >= 3 && parts.every((part) => part.split(/\s+/).length <= 3)) {
+    return "";
+  }
+  return name;
+}
+
 function cleanArtistToken(value: string): string | null {
   const cut = value.split(
     /\b(?:entry|doors?|box\s+office|pre[\s-]*sale|presale|tickets?)\b/i
   )[0] ?? "";
 
-  const name = stripDecorations(cut)
-    .replace(/@[A-Za-z0-9._]+/g, " ")
-    .replace(/\([^)]*\)/g, " ")
-    .replace(/\s+w\/\s*$/i, "")
-    .replace(/^[\s\-–—*|:;/\\]+/, "")
-    .replace(/[\s|:/\\.,]+$/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const name = stripLabelSuffix(
+    stripDecorations(cut)
+      .replace(/@[A-Za-z0-9._]+/g, " ")
+      .replace(/\[[^\]]*\]/g, " ")
+      .replace(/\([^)]*\)/g, " ")
+      .replace(/^(?:hosted\s+by\s*:?\s*)/i, "")
+      .replace(/\s+w\/\s*$/i, "")
+      .replace(/^[\s\-–—*|:;/\\+]+/, "")
+      .replace(/[\s|:/\\.,¿?]+$/g, "")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
 
   if (!name) return null;
   if (isLineupFloorLabel(name)) return null;
@@ -193,6 +263,9 @@ function cleanArtistToken(value: string): string | null {
   if (/^\(?a\s*-\s*z\)?:?$/i.test(name)) return null;
   if (/^https?:\/\//i.test(name)) return null;
   if (/^\d+$/.test(name)) return null;
+  if (/^(?:vienna debut|live|tba|tbc|residents?)$/i.test(name)) return null;
+  if (/\bresidents?\b/i.test(name) && name.split(/\s+/).length <= 4) return null;
+  if (/^[\p{So}\p{Sk}\p{P}\p{Z}█▓▒░■□●○]+$/u.test(name)) return null;
   if (/^\d{1,2}[:.]\d{2}/.test(name)) return null;
   if (!/\p{L}/u.test(name)) return null;
 
@@ -326,9 +399,10 @@ function collectLineupFromLines(lines: string[], startIndex: number): string[] {
   const artists: string[] = [];
   const headerLine = normalizeSpaces(lines[startIndex] ?? "");
   let index = startIndex;
+  const inlineHeader = splitInlineHeaderLine(headerLine);
 
-  if (isLineupHeaderLine(headerLine)) {
-    const inlineHeader = splitInlineHeaderLine(headerLine);
+  // "Lineup: A, B, C" is a header plus the whole bill on one line.
+  if (inlineHeader.isHeader || isLineupHeaderLine(headerLine)) {
     if (inlineHeader.isHeader && inlineHeader.remainder) {
       const status = consumeLine(inlineHeader.remainder, artists);
       if (status === "stop") return dedupeArtists(artists);
@@ -367,9 +441,35 @@ export function htmlToStructuredText(raw: string): string {
 }
 
 /**
- * Extract lineup rows from event text.
- * Room/floor headers are kept as `[MAINFLOOR]`-style stage markers.
- * A `b2b` / `f2f` set the source wrote as one line stays one element.
+ * Drop room headers, unnamed floor markers, and junk, then split billed pairs.
+ * Every source runs its lineup through this so a fix applies everywhere.
+ */
+export function normalizeLineupNames(names: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const raw of names) {
+    if (isLineupFloorLabel(raw)) continue;
+    const cleaned = cleanArtistToken(raw);
+    if (!cleaned || isLineupFloorLabel(cleaned)) continue;
+
+    for (const artist of splitLineupCollaborations(cleaned)) {
+      const name = cleanArtistToken(artist) ?? artist;
+      if (!name || isLineupFloorLabel(name)) continue;
+      const key = name.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(name);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Extract DJ names from a lineup section inside event description text.
+ * Room and floor headers are removed. b2b / B2B / vs / x / & pairs are split
+ * when they are two artists.
  */
 export function extractLineup(description: string): string[] {
   if (!description?.trim()) {
@@ -393,7 +493,8 @@ export function extractLineup(description: string): string[] {
   }
 
   const artists = collectLineupFromLines(lines, startIndex);
-  return artists.length > 0 ? artists : [];
+  const names = normalizeLineupNames(artists);
+  return names.length > 0 ? names : [];
 }
 
 function formatDescriptionBody(raw: string): string {

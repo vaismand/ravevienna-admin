@@ -7,6 +7,8 @@ export type ScrapedEvent = {
   sold_out?: boolean;
   genres: string[];
   description: string | null;
+  /** When set, this lineup is stored instead of one parsed from the description. */
+  lineup?: string[];
   ticket_url: string | null;
   image_url: string | null;
   external_url: string;

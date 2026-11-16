@@ -2,6 +2,7 @@ import * as cheerio from "cheerio";
 
 import {
   cleanText,
+  decodeHtml,
   guessGenres,
   http,
   isRelevantRaveEvent,
@@ -85,12 +86,29 @@ function parseSassTime(value: string): string | null {
   return `${String(hour).padStart(2, "0")}:${minute}:00`;
 }
 
-function parseArtists($: cheerio.CheerioAPI, $event: cheerio.Cheerio<any>) {
-  return $event
-    .find(".lineup strong")
-    .map((_, el) => cleanText($(el).text()))
-    .get()
+/**
+ * SASS bolds only part of some names (`<strong>La</strong>La`). Reading the
+ * `<strong>` text alone cuts that to "La". Each `<br>` row is one DJ, tags
+ * removed without inserting a space, handles dropped.
+ */
+export function parseSassLineupHtml(html: string): string[] {
+  const rows = html.replace(/<br\s*\/?>/gi, "\n");
+  const text = decodeHtml(rows).replace(/<[^>]+>/g, "");
+
+  return text
+    .split("\n")
+    .map((row) =>
+      row
+        .replace(/\[[^\]]*\]/g, " ")
+        .replace(/@[A-Za-z0-9._]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
     .filter(Boolean);
+}
+
+function parseArtists($: cheerio.CheerioAPI, $event: cheerio.Cheerio<any>) {
+  return parseSassLineupHtml($event.find(".lineup").html() ?? "");
 }
 
 function isMorningStartTime(startTime: string | null): boolean {

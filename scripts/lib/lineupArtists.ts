@@ -2,7 +2,42 @@
  * Lineup artist parsing shared by the scraper and admin DJ import.
  */
 
-const COLLABORATION_SPLIT = /\s+(?:b2b|f2f|vs\.?|&)\s*/i;
+const COLLABORATION_SEPARATOR =
+  /\s+(b2b|f2f|back[\s-]?to[\s-]?back|vs\.?|x|&)\s+/i;
+
+/**
+ * One act whose name contains "&" or "and". Splitting these would invent
+ * two DJs. Generic "Alpha & Beta" pairs are not in this set.
+ */
+const COMPOUND_ARTISTS = new Set([
+  "camo & krooked",
+  "camo and krooked",
+  "chase & status",
+  "above & beyond",
+  "pola & bryson",
+  "joro & joabo",
+  "fiio & humming people",
+]);
+
+function looksLikeArtistSide(value: string): boolean {
+  const clean = value.trim();
+  if (clean.length < 2 || clean.length > 60) return false;
+  if (!/\p{L}/u.test(clean)) return false;
+  return clean.split(/\s+/).length <= 5;
+}
+
+function separatorIsTwoArtists(separator: string, left: string, right: string): boolean {
+  if (/^x$/i.test(separator)) {
+    if (
+      /\b(?:showcase|night|presents?|pres\.?|tour|edition|open)\b/i.test(
+        `${left} ${right}`,
+      )
+    ) {
+      return false;
+    }
+  }
+  return looksLikeArtistSide(left) && looksLikeArtistSide(right);
+}
 
 /** Normalize whitespace and invisible characters for matching. */
 export function normalizeLineupArtistName(name: string): string {
@@ -17,21 +52,27 @@ function lineupDedupeKey(name: string): string {
 }
 
 /**
- * Split "Annakonda B2B Stendhal Syndrome", "AKOV F2F MANTA",
- * "A vs B", and "A & B" into individual artists.
+ * Split a billed pair into individual artists.
+ * `b2b` / `B2B` / `f2f` / `vs` always split. Spaced `x` and `&` split only
+ * when both sides are artist names. A letter inside a word (`Axel`, `R&B`)
+ * is not a separator, and known duo names stay intact.
  */
 export function splitLineupCollaborations(name: string): string[] {
   const clean = normalizeLineupArtistName(name);
   if (!clean) return [];
+  if (COMPOUND_ARTISTS.has(clean.toLowerCase())) return [clean];
 
-  const parts = clean
-    .split(COLLABORATION_SPLIT)
-    .map((part) => normalizeLineupArtistName(part))
-    .filter(Boolean);
+  const match = COLLABORATION_SEPARATOR.exec(clean);
+  if (!match || match.index == null) return [clean];
 
-  if (parts.length <= 1) return parts.length === 1 ? [clean] : [];
+  const left = normalizeLineupArtistName(clean.slice(0, match.index));
+  const right = normalizeLineupArtistName(clean.slice(match.index + match[0].length));
+  const separator = match[1] ?? "";
+  if (!left || !right || !separatorIsTwoArtists(separator, left, right)) {
+    return [clean];
+  }
 
-  return parts.flatMap(splitLineupCollaborations);
+  return [...splitLineupCollaborations(left), ...splitLineupCollaborations(right)];
 }
 
 /**

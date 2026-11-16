@@ -1,5 +1,7 @@
 import * as cheerio from "cheerio";
 
+import { isPastViennaDate } from "../../../scripts/lib/dates.ts";
+import { isPlaceholderImageUrl } from "../draftRefresh.ts";
 import {
   cleanText,
   guessGenres,
@@ -157,18 +159,22 @@ function isRelevantLoftEvent(event: {
 }
 
 /**
- * Detail pages list each DJ under a floor, e.g.
- * "Oben: A b2b B, C. Unten: D". The listing card only names the rooms.
+ * Detail pages put the bill in one Elementor line, sometimes per floor
+ * ("Oben: A b2b B. Unten: C") and sometimes as "Lineup: A, B, C" with no rooms.
+ * The listing card only names the rooms.
  */
-function loftPerDjFloors($: cheerio.CheerioAPI): string | null {
+export function loftLineupText($: cheerio.CheerioAPI): string | null {
   const seen = new Set<string>();
   const candidates: string[] = [];
 
   $(".elementor-widget-text-editor").each((_, el) => {
-    const text = cleanText($(el).text())
-      .replace(/^lineup\s*:\s*/i, "")
-      .trim();
-    if (!text || !/\b(?:oben|unten|wohnzimmer)\s*:/i.test(text)) return;
+    const raw = cleanText($(el).text()).trim();
+    const text = raw.replace(/^lineup\s*:\s*/i, "").trim();
+    if (!text) return;
+
+    const startsAsLineup = /^lineup\s*:/i.test(raw);
+    const hasFloors = /\b(?:oben|unten|wohnzimmer)\s*:/i.test(text);
+    if (!startsAsLineup && !hasFloors) return;
 
     const key = text.toLowerCase();
     if (seen.has(key)) return;
@@ -177,6 +183,21 @@ function loftPerDjFloors($: cheerio.CheerioAPI): string | null {
   });
 
   return candidates.sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
+/** Favicon and the site logo are not flyers. A real upload still wins. */
+export function chooseLoftImage(
+  ...candidates: Array<string | null | undefined>
+): string | null {
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const url = candidate.trim();
+    if (!/^https?:\/\//i.test(url)) continue;
+    if (isPlaceholderImageUrl(url)) continue;
+    if (/\b(?:logo|favicon|apple-touch-icon|site-icon)\b/i.test(url)) continue;
+    return url;
+  }
+  return null;
 }
 
 function extractEventLink($: cheerio.CheerioAPI) {
@@ -209,7 +230,7 @@ async function scrapeLoftDetail(eventUrl: string) {
     cleanText($("h1.elementor-heading-title").first().text()) ||
     cleanText(($("meta[property='og:title']").attr("content") ?? "").replace("@ The Loft", ""));
 
-  const floorLineup = loftPerDjFloors($);
+  const floorLineup = loftLineupText($);
   const descriptionBody =
     cleanText($(".party-inhalt").first().text()) ||
     cleanText(jsonLd?.description ?? "") ||
@@ -218,12 +239,13 @@ async function scrapeLoftDetail(eventUrl: string) {
     .filter(Boolean)
     .join("\n\n");
 
-  const image =
+  const image = chooseLoftImage(
+    absoluteUrl(typeof jsonLd?.image === "string" ? jsonLd.image : jsonLd?.image?.[0]),
+    absoluteUrl($("meta[property='og:image']").attr("content")),
     absoluteUrl(
-      (typeof jsonLd?.image === "string" ? jsonLd.image : jsonLd?.image?.[0]) ??
-        $("meta[property='og:image']").attr("content") ??
-        $(".elementor-widget-theme-post-featured-image img").first().attr("src")
-    ) ?? null;
+      $(".elementor-widget-theme-post-featured-image img").first().attr("src"),
+    ),
+  );
 
   const tags = $("meta[property='article:tag']")
     .map((_, el) => $(el).attr("content"))
@@ -273,7 +295,8 @@ export async function scrapeTheLoft(source: ScrapeSource): Promise<ScrapedEvent[
       };
     })
     .get()
-    .filter((event) => event.eventUrl && event.date && event.startTime);
+    .filter((event) => event.eventUrl && event.date && event.startTime)
+    .filter((event) => !isPastViennaDate(event.date));
 
   console.log(`Found ${listingEvents.length} The Loft event URLs`);
 
