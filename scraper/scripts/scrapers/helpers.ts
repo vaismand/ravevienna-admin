@@ -147,7 +147,8 @@ function textHasKeyword(text: string, keyword: string): boolean {
   return pattern.test(text);
 }
 
-const HARD_REJECT_KEYWORDS = [
+/** Named non-rave acts. These always reject, including when the blurb also says techno. */
+const NAMED_REJECT_ACTS = [
   "gregor hägele",
   "gregor haegele",
   "nervy",
@@ -170,20 +171,74 @@ const HARD_REJECT_KEYWORDS = [
   "sampagne",
   "yami safdie",
   "neunundneunzig",
-  "concert",
-  "tour",
-  "band",
-  "rock",
-  "metal",
-  "hip-hop",
-  "hip hop",
-  "rap",
-  "live concert",
+  "hämatom",
+  "haematom",
 ];
 
-/** Named concerts and other non-club bills. Shared by the keyword filter and Das Werk. */
+/**
+ * Genre words only count in a genre phrase: "rock night", "rock concert",
+ * "Rock/Pop", "Indie Rock", "hip-hop". A bare "rock" inside „When I Rock“
+ * or a longer word does not.
+ */
+const GENRE_CONTEXT_PATTERNS = [
+  /\b(?:indie|hard|punk|alternative|classic|glam|soft|prog|folk|deutsch)\s+rock\b/i,
+  /\brock\s+(?:night|concert|show|band|music|festival|n'?roll)\b/i,
+  /\b(?:metal|punk|rap|hip[\s-]?hop|schlager)\s+(?:night|concert|show|band|festival)\b/i,
+  /\b(?:rock|metal|punk|pop|indie|hip[\s-]?hop)\s*[/|]\s*(?:rock|metal|punk|pop|indie|hip[\s-]?hop)\b/i,
+  /\bhip[\s-]?hop\b/i,
+  /\bdeutschrock\b/i,
+  /\blive\s+concert\b/i,
+];
+
+/** A lineup credit that means the night is a rave even if a genre word also appears. */
+const KNOWN_RAVE_CREDITS = [
+  "thomas schumacher",
+  "elektrochemie",
+  "drumcode",
+  "electric ballroom",
+  "eatbrain",
+  "camo & krooked",
+  "camo and krooked",
+  "mefjus",
+  "noisia",
+  "hospital records",
+  "critical music",
+  "metalheadz",
+  "shogun audio",
+  "adam beyer",
+  "amelie lens",
+  "laurent garnier",
+];
+
+function withoutQuotedSpans(text: string): string {
+  return text
+    .replace(/[„"«][^"“»\n]{0,80}[“"»]/g, " ")
+    .replace(/"[^"\n]{0,80}"/g, " ");
+}
+
+function hasNamedRejectAct(text: string): boolean {
+  return NAMED_REJECT_ACTS.some((name) => textHasKeyword(text, name));
+}
+
+/** True when a genre word is used as a genre, not as a track or artist fragment. */
+export function hasGenreRejectContext(text: string): boolean {
+  const plain = withoutQuotedSpans(text);
+  return GENRE_CONTEXT_PATTERNS.some((pattern) => pattern.test(plain));
+}
+
+export function hasKnownRaveCredit(text: string): boolean {
+  return KNOWN_RAVE_CREDITS.some((name) => textHasKeyword(text, name));
+}
+
+/**
+ * Named concert acts always reject. Genre words reject only in a genre
+ * phrase, and a known techno / DnB / house credit outweighs that phrase.
+ */
 export function hasHardRejectKeywords(text: string): boolean {
-  return HARD_REJECT_KEYWORDS.some((keyword) => textHasKeyword(text, keyword));
+  if (hasNamedRejectAct(text)) return true;
+  if (!hasGenreRejectContext(text)) return false;
+  if (hasKnownRaveCredit(text)) return false;
+  return true;
 }
 
 export function isRelevantRaveEvent(event: ScrapedEvent): boolean {

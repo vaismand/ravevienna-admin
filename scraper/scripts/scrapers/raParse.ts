@@ -52,9 +52,48 @@ const STRONG_GENRES = new Set([
   "EBM",
 ]);
 
-const EXCLUDED_VENUE = [/o[-\s]?club/i, /o\s*der\s*klub/i, /volksgarten/i];
+/** Concert halls, fancy clubs, skybars, rooftop bars, and hotel bars. */
+const DENIED_VENUE = [
+  /o[-\s]?club/i,
+  /o\s*der\s*klub/i,
+  /volksgarten/i,
+  /konzerthaus/i,
+  /musikverein/i,
+  /staatsoper/i,
+  /volksoper/i,
+  /skybar/i,
+  /rooftop/i,
+  /hotel\s*bar/i,
+  /oktogon/i,
+  /am himmel/i,
+  /jaz in the city/i,
+];
 
-const NON_RAVE_TITLE = /\b(?:classical|jazz|hip[\s-]?hop|punk|metal|schlager|kabarett|comedy|wrestling)\b/i;
+/** Same idea when the venue name is generic but the title says where it is. */
+const DENIED_PLACE_TEXT = [/\bskybar\b/i, /\brooftop\b/i, /\bhotel\s*bar\b/i, /\bskyscraper\b/i];
+
+/** Clubs whose RA listings are in scope even when the title is loose. */
+const KNOWN_RAVE_VENUE = [
+  /das werk/i,
+  /grelle forelle/i,
+  /the loft/i,
+  /\bsass\b/i,
+  /flucc/i,
+  /\bflex\b/i,
+  /\barena\b/i,
+  /\brhiz\b/i,
+  /\bloop\b/i,
+  /kramladen/i,
+  /\bprst\b/i,
+  /club lucia/i,
+  /\bceleste\b/i,
+  /tagada/i,
+  /prater dome/i,
+  /club exil/i,
+  /weberknecht/i,
+];
+
+const DISCO_FUNK_ONLY = /\b(?:disco|funk|soul)\b/i;
 
 export type RaListingEvent = {
   id?: string;
@@ -126,28 +165,53 @@ function raStartIsClubTime(time: string | null): boolean {
   return hour >= 17 || hour < 6;
 }
 
-function venueIsOutOfScope(name: string): boolean {
-  return EXCLUDED_VENUE.some((pattern) => pattern.test(name));
+function matchesAny(value: string, patterns: RegExp[]): boolean {
+  return patterns.some((pattern) => pattern.test(value));
+}
+
+function strongFromRaTags(genreNames: string[]): boolean {
+  return genreNames.some((name) =>
+    guessGenres(name).some((genre) => STRONG_GENRES.has(genre)),
+  );
+}
+
+/** Disco / funk / soul tags and no techno, house, DnB, or other rave tag. */
+export function raGenresAreDiscoFunkOnly(genreNames: string[]): boolean {
+  if (genreNames.length === 0 || strongFromRaTags(genreNames)) return false;
+  return DISCO_FUNK_ONLY.test(genreNames.join(" "));
+}
+
+export function isDeniedRaVenue(venueName: string, title = ""): boolean {
+  if (matchesAny(venueName, DENIED_VENUE)) return true;
+  return matchesAny(`${venueName} ${title}`, DENIED_PLACE_TEXT);
+}
+
+export function isKnownRaveVenue(venueName: string): boolean {
+  return matchesAny(venueName, KNOWN_RAVE_VENUE);
+}
+
+function tagsAreNonRaveOnly(genreNames: string[]): boolean {
+  if (genreNames.length === 0 || strongFromRaTags(genreNames)) return false;
+  return genreNames.every((name) =>
+    /\b(?:classical|jazz|rock|metal|punk|pop|hip[\s-]?hop|folk|schlager)\b/i.test(name),
+  );
 }
 
 export function isRelevantRaEvent(event: {
   title: string;
   venueName: string;
   genres: string[];
+  /** RA's own genre tags. The title is not scanned, so "House of Funk" is not House. */
+  raGenres?: string[];
   artists: string[];
   promoters: string[];
 }): boolean {
-  if (venueIsOutOfScope(event.venueName)) return false;
+  if (isDeniedRaVenue(event.venueName, event.title)) return false;
 
-  const text = [event.title, ...event.artists, ...event.promoters, ...event.genres].join(" ");
-  const strong =
-    event.genres.some((genre) => STRONG_GENRES.has(genre)) ||
-    guessGenres(text).some((genre) => STRONG_GENRES.has(genre));
-  if (!strong) return false;
-  if (NON_RAVE_TITLE.test(event.title) && !event.genres.some((genre) => STRONG_GENRES.has(genre))) {
-    return false;
-  }
-  return true;
+  const tags = event.raGenres ?? event.genres;
+  if (isKnownRaveVenue(event.venueName)) return !tagsAreNonRaveOnly(tags);
+  if (raGenresAreDiscoFunkOnly(tags)) return false;
+  return strongFromRaTags(tags);
 }
 
 function listingEvents(payload: unknown): RaListingEvent[] {
@@ -195,6 +259,7 @@ export function parseRaEventListings(
         title,
         venueName,
         genres,
+        raGenres: genreNames,
         artists: artistNames,
         promoters: promoterNames,
       })
