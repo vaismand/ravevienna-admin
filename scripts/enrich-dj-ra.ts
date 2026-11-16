@@ -14,6 +14,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { isDjLocationLocked } from "../src/lib/djLocationLock.ts";
 import { loadScriptEnv } from "./lib/loadEnv.ts";
 import {
   isRaBotChallengeHtml,
@@ -66,6 +67,7 @@ type DjRow = {
   image_url: string | null;
   country: string | null;
   city: string | null;
+  location_locked?: boolean | null;
   ra_url?: string | null;
   ra_slug?: string | null;
   ra_followers?: number | null;
@@ -367,7 +369,7 @@ function buildUpdates(
     }
   }
 
-  if (parsed.country) {
+  if (parsed.country && !isDjLocationLocked(dj)) {
     const canWrite = !dj || isBlank(dj.country) || options.overwriteLocation;
     if (canWrite) {
       set(

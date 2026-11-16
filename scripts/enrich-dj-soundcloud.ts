@@ -14,6 +14,7 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { withoutLockedLocationFields } from "../src/lib/djLocationLock.ts";
 import { loadScriptEnv } from "./lib/loadEnv.ts";
 import {
   fetchSoundCloudProfile,
@@ -48,6 +49,7 @@ type DjRow = {
   image_url: string | null;
   city: string | null;
   country: string | null;
+  location_locked?: boolean | null;
 };
 
 function parseArgs(argv: string[]): CliOptions {
@@ -209,7 +211,7 @@ function buildUpdatePayload(
     payload.country = parsed.countryCode;
   }
 
-  return payload;
+  return withoutLockedLocationFields(dj, payload);
 }
 
 function hasWritableChanges(payload: Record<string, string>): boolean {

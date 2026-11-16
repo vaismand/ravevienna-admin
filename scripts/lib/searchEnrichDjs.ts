@@ -154,6 +154,7 @@ function toDj(row: Record<string, unknown>): DjEnrichmentRow {
     image_url: typeof row.image_url === "string" ? row.image_url : null,
     city: typeof row.city === "string" ? row.city : null,
     country: typeof row.country === "string" ? row.country : null,
+    location_locked: row.location_locked === true,
     raw: row,
   };
 }
