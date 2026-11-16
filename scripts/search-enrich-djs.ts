@@ -113,7 +113,8 @@ Usage:
 --slug        Only this slug. Repeat the flag to pass several.
 --force       Overwrite non-empty fields on auto-confident matches
 --fix-default-location
-              Replace Vienna/Austria only when the accepted profile is elsewhere
+              Replace Vienna/Austria only when the accepted profile is elsewhere.
+              Skipped when location_locked is true.
 `);
 }
 

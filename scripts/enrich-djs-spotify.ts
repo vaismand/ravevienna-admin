@@ -21,6 +21,7 @@ import {
   pickBestSpotifyMatch,
   type SpotifyArtistCandidate,
 } from "./lib/djSpotifyMatch.ts";
+import { withoutLockedLocationFields } from "../src/lib/djLocationLock.ts";
 import { loadScriptEnv } from "./lib/loadEnv.ts";
 import { normalizeSpotifyGenres } from "./lib/normalizeSpotifyGenres.ts";
 
@@ -58,6 +59,7 @@ type DjRow = {
   spotify_id?: string | null;
   spotify_popularity?: number | null;
   followers?: number | null;
+  location_locked?: boolean | null;
 };
 
 type DjEnrichmentColumns = {
@@ -358,7 +360,7 @@ function buildUpdatePayload(
     payload.followers = match.followers;
   }
 
-  return payload;
+  return withoutLockedLocationFields(row, payload);
 }
 
 function hasWritableChanges(payload: Record<string, unknown>): boolean {

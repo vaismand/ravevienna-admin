@@ -14,6 +14,7 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { isDjLocationLocked, withoutLockedLocationFields } from "../src/lib/djLocationLock.ts";
 import { loadScriptEnv } from "./lib/loadEnv.ts";
 import { formatSoundCloudBioForDj } from "./lib/parseSoundCloudProfile.ts";
 import {
@@ -55,6 +56,7 @@ type DjRow = {
   image_url: string | null;
   city: string | null;
   country: string | null;
+  location_locked?: boolean | null;
   enrichment_source?: string | null;
   enrichment_confidence?: number | null;
   enriched_at?: string | null;
@@ -129,6 +131,7 @@ function isBlank(value: string | null | undefined): boolean {
 }
 
 function isLocationMissing(dj: DjRow): boolean {
+  if (isDjLocationLocked(dj)) return false;
   return isBlank(dj.city) && isBlank(dj.country);
 }
 
@@ -242,7 +245,7 @@ function buildUpdatePayload(
       .filter(Boolean)
       .join(", ");
 
-  if (isLocationMissing(dj) || force) {
+  if (!isDjLocationLocked(dj) && (isLocationMissing(dj) || force)) {
     const { city, country } = splitLocationToCityCountry(locationFromProfile);
     const resolvedCountry = country ?? countryLabelFromCode(profile.countryCode);
 
@@ -264,7 +267,7 @@ function buildUpdatePayload(
     payload.enriched_at = new Date().toISOString();
   }
 
-  return payload;
+  return withoutLockedLocationFields(dj, payload);
 }
 
 function hasWritableChanges(payload: Record<string, unknown>): boolean {

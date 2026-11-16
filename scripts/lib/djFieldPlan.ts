@@ -1,4 +1,5 @@
 import type { DjProfileCandidate } from "./djCandidateScore.ts";
+import { isDjLocationLocked } from "../../src/lib/djLocationLock.ts";
 import {
   concreteLocation,
   countryTier,
@@ -22,6 +23,8 @@ export type DjEnrichmentRow = {
   image_url: string | null;
   city: string | null;
   country: string | null;
+  /** Absent when the column has not been added yet. */
+  location_locked?: boolean;
   /** Original column values, including optional columns not on the typed row. */
   raw: Record<string, unknown>;
 };
@@ -113,6 +116,7 @@ export function planDjFieldUpdates(input: {
   onlyEmpty?: boolean;
 }): FieldPlan {
   const { dj, soundcloud, ra, columns } = input;
+  const locationLocked = isDjLocationLocked(dj) || isDjLocationLocked(dj.raw);
   const overwriteFilled = input.force && input.onlyEmpty !== true;
   const updates: Record<string, unknown> = {};
   const filled: string[] = [];
@@ -226,6 +230,14 @@ export function planDjFieldUpdates(input: {
       continue;
     }
 
+    if (
+      locationLocked &&
+      (column === "city" || column === "country")
+    ) {
+      pushUnique(skippedNonEmpty, column);
+      continue;
+    }
+
     if (!isEmptyValue(dj.raw[column]) && !overwriteFilled) {
       pushUnique(skippedNonEmpty, column);
       continue;
@@ -237,6 +249,7 @@ export function planDjFieldUpdates(input: {
 
   if (
     input.fixDefaultLocation &&
+    !locationLocked &&
     input.onlyEmpty !== true &&
     isViennaAustriaDefault(dj)
   ) {

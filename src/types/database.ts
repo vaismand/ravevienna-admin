@@ -153,6 +153,8 @@ export interface Dj {
   image_url?: string | null;
   city?: string | null;
   country?: string | null;
+  /** Set when an admin saves a city or country. Absent until that column exists. */
+  location_locked?: boolean;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;

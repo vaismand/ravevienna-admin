@@ -15,6 +15,7 @@ import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { withoutLockedLocationFields } from "../src/lib/djLocationLock.ts";
 import { loadScriptEnv } from "./lib/loadEnv.ts";
 import { formatSoundCloudBioForDj } from "./lib/parseSoundCloudProfile.ts";
 import { SoundCloudApiClient } from "./lib/soundCloudApiClient.ts";
@@ -54,6 +55,7 @@ type DjRow = {
   image_url: string | null;
   city: string | null;
   country: string | null;
+  location_locked?: boolean | null;
   enrichment_source?: string | null;
   enrichment_confidence?: number | null;
 };
@@ -239,7 +241,7 @@ function buildUpdatePayload(
     payload.enrichment_confidence = match.score;
   }
 
-  return payload;
+  return withoutLockedLocationFields(dj, payload);
 }
 
 function hasWritableChanges(payload: Record<string, unknown>): boolean {

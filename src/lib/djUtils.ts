@@ -82,6 +82,8 @@ export function matchesDjSearch(dj: Dj, query: string): boolean {
 
 export function djFormToPayload(data: DjFormData) {
   const trimOrNull = (v: string) => v.trim() || null;
+  const city = trimOrNull(data.city);
+  const country = trimOrNull(data.country);
   return {
     name: data.name.trim(),
     slug: data.slug.trim(),
@@ -92,8 +94,9 @@ export function djFormToPayload(data: DjFormData) {
     spotify_url: trimOrNull(data.spotify_url),
     website_url: trimOrNull(data.website_url),
     image_url: trimOrNull(data.image_url),
-    city: trimOrNull(data.city) ?? 'Vienna',
-    country: trimOrNull(data.country) ?? 'Austria',
+    city,
+    country,
+    ...(city || country ? { location_locked: true as const } : {}),
     is_active: data.is_active,
     updated_at: new Date().toISOString(),
   };
@@ -110,8 +113,8 @@ export function djToFormData(dj: Dj): DjFormData {
     spotify_url: dj.spotify_url ?? '',
     website_url: dj.website_url ?? '',
     image_url: dj.image_url ?? '',
-    city: dj.city ?? 'Vienna',
-    country: dj.country ?? 'Austria',
+    city: dj.city ?? '',
+    country: dj.country ?? '',
     is_active: dj.is_active ?? true,
   };
 }

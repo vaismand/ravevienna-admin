@@ -43,7 +43,7 @@ npm run enrich:dj:ra -- --url "https://de.ra.co/dj/esti.d" --name "esti.d" \
 | `--apply` | Write to Supabase (default is dry-run) |
 | `--overwrite-socials` | Replace existing Instagram/SoundCloud |
 | `--overwrite-image` | Replace `image_url` (with `--allow-ra-image`) |
-| `--overwrite-location` | Replace `country` |
+| `--overwrite-location` | Replace `country`, unless `location_locked` is true |
 | `--allow-ra-image` | Save RA profile image when `image_url` empty |
 | `--copy-bio` | Copy RA bio (copyright warning) |
 | `--create-if-missing` | Insert new DJ when no match |

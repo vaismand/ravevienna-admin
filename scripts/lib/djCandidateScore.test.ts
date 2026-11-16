@@ -691,6 +691,72 @@ describe("planDjFieldUpdates", () => {
     assert.equal(location.updates.city, undefined);
     assert.equal(location.updates.country, undefined);
   });
+
+  it("does not overwrite a locked location with force or fix-default-location", () => {
+    const sanDiego = candidate({
+      name: "MANDALA",
+      city: "San Diego",
+      country: "United States",
+      bio: "West coast.",
+      profileUrl: "https://soundcloud.com/mandala-sd",
+      soundcloudUrl: "https://soundcloud.com/mandala-sd",
+    });
+    const locked = emptyDj({
+      name: "MANDALA",
+      slug: "mandala",
+      city: "Vienna",
+      country: "Austria",
+      location_locked: true,
+      bio: null,
+    });
+
+    const forced = planDjFieldUpdates({
+      dj: locked,
+      soundcloud: sanDiego,
+      ra: null,
+      force: true,
+      fixDefaultLocation: true,
+      columns: COLUMNS,
+    });
+    assert.equal(forced.updates.city, undefined);
+    assert.equal(forced.updates.country, undefined);
+    assert.equal(forced.updates.bio, "West coast.");
+    assert.ok(forced.skippedNonEmpty.includes("city"));
+    assert.ok(forced.skippedNonEmpty.includes("country"));
+
+    const emptyCity = planDjFieldUpdates({
+      dj: emptyDj({
+        name: "MANDALA",
+        slug: "mandala",
+        city: null,
+        country: "Austria",
+        location_locked: true,
+      }),
+      soundcloud: sanDiego,
+      ra: null,
+      force: true,
+      fixDefaultLocation: true,
+      columns: COLUMNS,
+    });
+    assert.equal(emptyCity.updates.city, undefined);
+    assert.equal(emptyCity.updates.country, undefined);
+
+    const columnMissing = planDjFieldUpdates({
+      dj: emptyDj({
+        name: "MANDALA",
+        slug: "mandala",
+        city: "Vienna",
+        country: "Austria",
+      }),
+      soundcloud: sanDiego,
+      ra: null,
+      force: true,
+      fixDefaultLocation: true,
+      columns: COLUMNS,
+    });
+    assert.equal(columnMissing.updates.city, "San Diego");
+    assert.equal(columnMissing.updates.country, "United States");
+  });
 });
 
 describe("matchDjProfiles", () => {

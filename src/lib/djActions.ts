@@ -1,7 +1,28 @@
 import { supabase } from './supabase';
+import { rowWithoutMissingLocationLock } from './djLocationLock';
 import { djFormToPayload } from './djUtils';
 import { formatPostgrestError } from './supabaseErrors';
 import type { Dj, DjFormData } from '../types/database';
+
+type DjWriteResult = {
+  data: Dj | null;
+  error: unknown;
+};
+
+async function saveDj(
+  write: (row: Record<string, unknown>) => PromiseLike<DjWriteResult>,
+  row: Record<string, unknown>,
+): Promise<Dj> {
+  const first = await write(row);
+  if (!first.error) return first.data as Dj;
+
+  const retry = rowWithoutMissingLocationLock(row, first.error);
+  if (!retry) throw new Error(formatPostgrestError(first.error));
+
+  const second = await write(retry);
+  if (second.error) throw new Error(formatPostgrestError(second.error));
+  return second.data as Dj;
+}
 
 export async function fetchDjs(): Promise<Dj[]> {
   const { data, error } = await supabase
@@ -25,29 +46,22 @@ export async function fetchActiveDjs(): Promise<Dj[]> {
 }
 
 export async function createDj(payload: DjFormData): Promise<Dj> {
-  const { data, error } = await supabase
-    .from('djs')
-    .insert({
-      ...djFormToPayload(payload),
-      created_at: new Date().toISOString(),
-    })
-    .select('*')
-    .single();
-
-  if (error) throw new Error(formatPostgrestError(error));
-  return data as Dj;
+  const row = {
+    ...djFormToPayload(payload),
+    created_at: new Date().toISOString(),
+  };
+  return saveDj(
+    (body) => supabase.from('djs').insert(body).select('*').single(),
+    row,
+  );
 }
 
 export async function updateDj(id: string, payload: DjFormData): Promise<Dj> {
-  const { data, error } = await supabase
-    .from('djs')
-    .update(djFormToPayload(payload))
-    .eq('id', id)
-    .select('*')
-    .single();
-
-  if (error) throw new Error(formatPostgrestError(error));
-  return data as Dj;
+  return saveDj(
+    (body) =>
+      supabase.from('djs').update(body).eq('id', id).select('*').single(),
+    djFormToPayload(payload),
+  );
 }
 
 export async function deleteDj(id: string): Promise<void> {
